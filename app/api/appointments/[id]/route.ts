@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../src/lib/prisma";
 import { getAuthenticatedDonor } from "../../../../src/lib/auth";
+import { notifyUser } from "../../../../src/lib/notifications";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -89,6 +90,27 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         },
       },
     });
+
+    if (data.status === "CANCELLED") {
+      await notifyUser({
+        userId: authentication.user.id,
+        type: "APPOINTMENT",
+        title: "Appointment cancelled",
+        message: `Your donation appointment at ${updatedAppointment.healthInstitute.name} has been cancelled.`,
+        link: "/appointments",
+      });
+    } else if (data.appointmentDate || data.appointmentTime) {
+      await notifyUser({
+        userId: authentication.user.id,
+        type: "APPOINTMENT",
+        title: "Appointment rescheduled",
+        message: `Your donation appointment at ${updatedAppointment.healthInstitute.name} has been moved to ${updatedAppointment.appointmentDate.toLocaleDateString(
+          "en-GB",
+          { day: "numeric", month: "long", year: "numeric" }
+        )} at ${updatedAppointment.appointmentTime}.`,
+        link: "/appointments",
+      });
+    }
 
     return NextResponse.json({ appointment: updatedAppointment });
   } catch (error) {

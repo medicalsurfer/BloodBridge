@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
 import { createUser, getUserByEmail } from "../../../src/lib/prisma";
+import { logAudit } from "../../../src/lib/audit";
 
 function isAllowedEmail(email: string) {
   const normalizedEmail = email.trim().toLowerCase();
@@ -51,6 +52,14 @@ export async function POST(request: NextRequest) {
     email: normalizedEmail,
     passwordHash,
     phoneNumber: phone ? String(phone).trim() : null,
+  });
+
+  await logAudit({
+    actorId: user.id,
+    action: "USER_REGISTERED",
+    targetType: "User",
+    targetId: user.id,
+    metadata: { email: user.email },
   });
 
   return NextResponse.json(

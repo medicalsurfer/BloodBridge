@@ -53,7 +53,7 @@ export default async function DonationCentresPage() {
           </div>
 
           <Link
-            href="/donor"
+            href="/home"
             className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700"
           >
             Back to dashboard
@@ -129,7 +129,7 @@ export default async function DonationCentresPage() {
                 </div>
 
                 <Link
-                  href={`/appointments?instituteId=${centre.id}`}
+                  href={`/appointments/book?instituteId=${centre.id}`}
                   style={{ backgroundColor: PRIMARY_RED }}
                   className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-xl px-4 text-sm font-semibold text-white transition hover:brightness-125"
                 >

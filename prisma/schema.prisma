@@ -43,6 +43,56 @@ enum AppointmentStatus {
   CANCELLED
 }
 
+enum RequestUrgency {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum BloodRequestStatus {
+  OPEN
+  FULFILLED
+  CANCELLED
+}
+
+enum NotificationType {
+  APPOINTMENT
+  DONATION
+  BLOOD_REQUEST
+  REWARD
+  STAFF
+  CHAT
+  SYSTEM
+}
+
+enum RewardStatus {
+  PENDING
+  VALIDATED
+  REJECTED
+}
+
+enum AuditAction {
+  USER_REGISTERED
+  USER_LOGGED_IN
+  USER_CREATED
+  USER_UPDATED
+  USER_DELETED
+  INSTITUTE_CREATED
+  INSTITUTE_UPDATED
+  INSTITUTE_STATUS_CHANGED
+  INSTITUTE_DELETED
+  STAFF_INVITED
+  STAFF_REMOVED
+  APPOINTMENT_BOOKED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_RESCHEDULED
+  DONATION_RECORDED
+  BLOOD_REQUEST_CREATED
+  REWARD_VALIDATED
+  REWARD_REJECTED
+}
+
 model User {
   id           String   @id @default(cuid())
   firstName    String
@@ -52,14 +102,115 @@ model User {
   phoneNumber  String?
   role         UserRole @default(DONOR)
   isActive     Boolean  @default(true)
+  healthInstituteId String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   donorProfile DonorProfile?
   appointments Appointment[]
+  bloodRequests BloodRequest[]
+  donations Donation[] @relation("DonorDonations")
+  recordedDonations Donation[] @relation("RecordedDonations")
+  healthInstitute HealthInstitute? @relation(fields: [healthInstituteId], references: [id], onDelete: SetNull)
+
+  notifications      Notification[]
+  donorRewards       DonationReward[] @relation("DonorRewards")
+  validatedRewards   DonationReward[] @relation("ValidatedRewards")
+  auditLogs          AuditLog[]
+  donorConversations Conversation[]   @relation("DonorConversations")
+  messages           Message[]
 
   @@index([email])
+  @@index([healthInstituteId])
   @@map("users")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType @default(SYSTEM)
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model DonationReward {
+  id                String       @id @default(cuid())
+  donationId        String       @unique
+  donorId           String
+  healthInstituteId String
+  points            Int          @default(50)
+  status            RewardStatus @default(PENDING)
+  validatedById     String?
+  validatedAt       DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  donation        Donation        @relation(fields: [donationId], references: [id], onDelete: Cascade)
+  donor           User            @relation("DonorRewards", fields: [donorId], references: [id], onDelete: Cascade)
+  healthInstitute HealthInstitute @relation(fields: [healthInstituteId], references: [id], onDelete: Cascade)
+  validatedBy     User?           @relation("ValidatedRewards", fields: [validatedById], references: [id], onDelete: SetNull)
+
+  @@index([donorId])
+  @@index([healthInstituteId])
+  @@index([status])
+  @@map("donation_rewards")
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  actorId    String?
+  action     AuditAction
+  targetType String
+  targetId   String?
+  metadata   String?
+  createdAt  DateTime    @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Conversation {
+  id                String   @id @default(cuid())
+  donorId           String
+  healthInstituteId String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  donor           User            @relation("DonorConversations", fields: [donorId], references: [id], onDelete: Cascade)
+  healthInstitute HealthInstitute @relation(fields: [healthInstituteId], references: [id], onDelete: Cascade)
+  messages        Message[]
+
+  @@unique([donorId, healthInstituteId])
+  @@index([healthInstituteId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String    @id @default(cuid())
+  conversationId String
+  senderId       String
+  body           String
+  createdAt      DateTime  @default(now())
+  readAt         DateTime?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("messages")
 }
 
 model DonorProfile {
@@ -92,6 +243,12 @@ model HealthInstitute {
   isActive    Boolean         @default(true)
 
   appointments Appointment[]
+  administrators User[]
+  bloodRequests BloodRequest[]
+  donations Donation[]
+  bloodInventory BloodInventory[]
+  donationRewards DonationReward[]
+  conversations Conversation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -116,10 +273,73 @@ model Appointment {
 
   donor           User            @relation(fields: [donorId], references: [id], onDelete: Cascade)
   healthInstitute HealthInstitute @relation(fields: [healthInstituteId], references: [id], onDelete: Cascade)
+  donation        Donation?
 
   @@index([donorId])
   @@index([healthInstituteId])
   @@index([appointmentDate])
   @@index([status])
   @@map("appointments")
+}
+
+model BloodRequest {
+  id                String              @id @default(cuid())
+  healthInstituteId String
+  requestedById     String
+  bloodGroup        BloodGroup
+  unitsNeeded       Int
+  urgency           RequestUrgency      @default(MEDIUM)
+  status            BloodRequestStatus  @default(OPEN)
+  notes             String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  healthInstitute HealthInstitute @relation(fields: [healthInstituteId], references: [id], onDelete: Cascade)
+  requestedBy     User            @relation(fields: [requestedById], references: [id], onDelete: Cascade)
+
+  @@index([healthInstituteId])
+  @@index([status])
+  @@index([bloodGroup])
+  @@map("blood_requests")
+}
+
+model Donation {
+  id                String     @id @default(cuid())
+  donorId           String
+  healthInstituteId String
+  appointmentId     String?    @unique
+  recordedById      String
+  bloodGroup        BloodGroup
+  volumeMl          Int        @default(450)
+  bloodPackId       String?
+  notes             String?
+  donatedAt         DateTime   @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  donor           User            @relation("DonorDonations", fields: [donorId], references: [id], onDelete: Cascade)
+  recordedBy      User            @relation("RecordedDonations", fields: [recordedById], references: [id], onDelete: Cascade)
+  healthInstitute HealthInstitute @relation(fields: [healthInstituteId], references: [id], onDelete: Cascade)
+  appointment     Appointment?    @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  reward          DonationReward?
+
+  @@index([donorId])
+  @@index([healthInstituteId])
+  @@index([donatedAt])
+  @@map("donations")
+}
+
+model BloodInventory {
+  id                String     @id @default(cuid())
+  healthInstituteId String
+  bloodGroup        BloodGroup
+  units             Int        @default(0)
+  updatedAt         DateTime   @updatedAt
+
+  healthInstitute HealthInstitute @relation(fields: [healthInstituteId], references: [id], onDelete: Cascade)
+
+  @@unique([healthInstituteId, bloodGroup])
+  @@map("blood_inventory")
 }

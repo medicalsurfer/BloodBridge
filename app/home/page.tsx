@@ -17,6 +17,14 @@ export default function HomePage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    fetch("/api/notifications", { credentials: "include", cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => setUnreadCount(data?.unreadCount ?? 0))
+      .catch(() => setUnreadCount(0));
+  }, []);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -105,7 +113,7 @@ export default function HomePage() {
       className="p-2"
     >
       <section className="mx-auto min-h-[calc(100vh-1rem)] max-w-375 overflow-hidden rounded-3xl border border-white bg-white shadow-xl">
-        <Navbar user={user} />
+        <Navbar user={user} unreadCount={unreadCount} />
 
         <div className="bg-slate-50/70 px-5 py-6 sm:px-8 lg:px-12 xl:px-16">
           <WelcomeSection user={user} />
@@ -135,7 +143,7 @@ export default function HomePage() {
   );
 }
 
-function Navbar({ user }: { user: User }) {
+function Navbar({ user, unreadCount = 0 }: { user: User; unreadCount?: number }) {
   return (
     <header className="flex h-19.5 items-center justify-between border-b border-slate-100 bg-white px-5 sm:px-8 lg:px-12 xl:px-16">
       <Link href="/home" className="flex items-center gap-3">
@@ -172,28 +180,34 @@ function Navbar({ user }: { user: User }) {
           My donations
         </NavItem>
 
-        <NavItem href="/requests">
+        <NavItem href="/request">
           Blood requests
         </NavItem>
 
-        <NavItem href="/notifications">
-          Notifications
+        <NavItem href="/rewards">
+          Rewards
+        </NavItem>
+
+        <NavItem href="/chat">
+          Chat
         </NavItem>
       </nav>
 
       <div className="flex items-center gap-3">
         <Link
-          href="/notifications"
+          href="/notification"
           className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
         >
           <BellIcon />
 
-          <span
-            style={{
-              backgroundColor: PRIMARY_RED,
-            }}
-            className="absolute right-2 top-2 h-2 w-2 rounded-full ring-2 ring-white"
-          />
+          {unreadCount > 0 && (
+            <span
+              style={{
+                backgroundColor: PRIMARY_RED,
+              }}
+              className="absolute right-2 top-2 h-2 w-2 rounded-full ring-2 ring-white"
+            />
+          )}
         </Link>
 
         <Link
@@ -430,6 +444,20 @@ function QuickActions() {
           title="Find centre"
           description="Locate participating centres."
         />
+
+        <ActionCard
+          href="/rewards"
+          icon={<GiftIcon />}
+          title="My rewards"
+          description="Track your donation points."
+        />
+
+        <ActionCard
+          href="/chat"
+          icon={<ChatIcon />}
+          title="Chat"
+          description="Message your donation centre."
+        />
       </div>
     </section>
   );
@@ -499,7 +527,7 @@ function BloodRequests() {
 
         <div className="flex items-center border-t border-red-100 bg-white/50 p-5 md:border-l md:border-t-0">
           <Link
-            href="/requests"
+            href="/request"
             className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-950 px-5 text-xs font-semibold text-white transition hover:brightness-125 md:w-auto"
           >
             View requests
@@ -721,7 +749,7 @@ function NotificationsCard() {
         </p>
 
         <Link
-          href="/notifications"
+          href="/notification"
           className="mt-4 inline-flex items-center gap-2 text-[10px] font-semibold text-white"
         >
           View notifications
@@ -969,6 +997,38 @@ function LocationIcon() {
       <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
 
       <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  );
+}
+
+function GiftIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <rect x="4" y="9" width="16" height="11" rx="1.5" />
+      <path d="M4 13h16" />
+      <path d="M12 9v11" />
+      <path d="M12 9c-1.5-3.5-6-3.5-6-1s2.5 1.5 6 1Z" />
+      <path d="M12 9c1.5-3.5 6-3.5 6-1s-2.5 1.5-6 1Z" />
+    </svg>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path d="M4 5h16v11H8l-4 4V5Z" />
     </svg>
   );
 }

@@ -1,648 +1,339 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { getAuthenticatedUserFromToken } from "@/src/lib/auth";
 import { prisma } from "@/src/lib/prisma";
+import {
+  KpiCard,
+  TrendAreaChart,
+  WeekdayBarChart,
+  BreakdownBar,
+  ActivityFeed,
+  DashboardCard,
+  bucketByDay,
+  weekdayCounts,
+  formatRelativeTime,
+  type ActivityItem,
+} from "@/src/components/dashboard/DashboardWidgets";
 
 const PRIMARY_RED = "oklch(27.1% 0.105 12.094)";
 
+const bloodGroupLabels: Record<string, string> = {
+  O_POSITIVE: "O+",
+  O_NEGATIVE: "O-",
+  A_POSITIVE: "A+",
+  A_NEGATIVE: "A-",
+  B_POSITIVE: "B+",
+  B_NEGATIVE: "B-",
+  AB_POSITIVE: "AB+",
+  AB_NEGATIVE: "AB-",
+};
+
+const bloodGroupColors: Record<string, string> = {
+  O_POSITIVE: PRIMARY_RED,
+  O_NEGATIVE: "oklch(45% 0.16 20)",
+  A_POSITIVE: "oklch(62% 0.15 40)",
+  A_NEGATIVE: "oklch(70% 0.15 60)",
+  B_POSITIVE: "oklch(60% 0.12 250)",
+  B_NEGATIVE: "oklch(68% 0.11 260)",
+  AB_POSITIVE: "oklch(55% 0.14 320)",
+  AB_NEGATIVE: "oklch(65% 0.02 260)",
+};
+
+const activityMeta: Record<
+  string,
+  { verb: string; badgeClassName: string; icon: React.ReactNode }
+> = {
+  USER_REGISTERED: { verb: "registered a new account", badgeClassName: "bg-blue-50 text-blue-600", icon: <UsersIcon /> },
+  USER_LOGGED_IN: { verb: "signed in", badgeClassName: "bg-slate-100 text-slate-500", icon: <UsersIcon /> },
+  USER_CREATED: { verb: "created a user account", badgeClassName: "bg-blue-50 text-blue-600", icon: <UsersIcon /> },
+  USER_UPDATED: { verb: "updated a user account", badgeClassName: "bg-slate-100 text-slate-500", icon: <UsersIcon /> },
+  USER_DELETED: { verb: "removed a user account", badgeClassName: "bg-red-50 text-red-700", icon: <UsersIcon /> },
+  INSTITUTE_CREATED: { verb: "registered a health institute", badgeClassName: "bg-red-50 text-red-950", icon: <HospitalIcon /> },
+  INSTITUTE_UPDATED: { verb: "updated a health institute", badgeClassName: "bg-red-50 text-red-950", icon: <HospitalIcon /> },
+  INSTITUTE_STATUS_CHANGED: { verb: "changed an institute's status", badgeClassName: "bg-amber-50 text-amber-700", icon: <HospitalIcon /> },
+  INSTITUTE_DELETED: { verb: "removed a health institute", badgeClassName: "bg-red-50 text-red-700", icon: <HospitalIcon /> },
+  STAFF_INVITED: { verb: "invited a staff member", badgeClassName: "bg-amber-50 text-amber-700", icon: <MailIcon /> },
+  STAFF_REMOVED: { verb: "removed a staff member", badgeClassName: "bg-amber-50 text-amber-700", icon: <MailIcon /> },
+  APPOINTMENT_BOOKED: { verb: "booked an appointment", badgeClassName: "bg-amber-50 text-amber-700", icon: <CalendarIcon /> },
+  APPOINTMENT_CANCELLED: { verb: "cancelled an appointment", badgeClassName: "bg-slate-100 text-slate-500", icon: <CalendarIcon /> },
+  APPOINTMENT_RESCHEDULED: { verb: "rescheduled an appointment", badgeClassName: "bg-amber-50 text-amber-700", icon: <CalendarIcon /> },
+  DONATION_RECORDED: { verb: "recorded a blood donation", badgeClassName: "bg-emerald-50 text-emerald-700", icon: <HeartIcon /> },
+  BLOOD_REQUEST_CREATED: { verb: "opened a blood request", badgeClassName: "bg-red-50 text-red-700", icon: <DropletIcon /> },
+  REWARD_VALIDATED: { verb: "validated a donation reward", badgeClassName: "bg-purple-50 text-purple-700", icon: <AwardIcon /> },
+  REWARD_REJECTED: { verb: "rejected a donation reward", badgeClassName: "bg-slate-100 text-slate-500", icon: <AwardIcon /> },
+};
+
 export const dynamic = "force-dynamic";
 
+function percentChange(current: number, previous: number) {
+  if (previous === 0) {
+    return current > 0 ? { delta: "New", trend: "up" as const } : undefined;
+  }
+
+  const change = ((current - previous) / previous) * 100;
+  const rounded = Math.round(change * 10) / 10;
+
+  return {
+    delta: `${rounded > 0 ? "+" : ""}${rounded}%`,
+    trend: rounded > 0 ? ("up" as const) : rounded < 0 ? ("down" as const) : ("flat" as const),
+  };
+}
+
 export default async function SystemAdminPage() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("bloodbridge_session")?.value;
-
-  if (!token) {
-    redirect("/login");
-  }
-
-  const authentication = await getAuthenticatedUserFromToken(token);
-
-  if (
-    !authentication.user ||
-    authentication.user.role !== "SYSTEM_ADMIN"
-  ) {
-    redirect("/home");
-  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const fourteenDaysAgo = new Date(today);
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const sixtyDaysAgo = new Date(today);
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
   const [
     totalInstitutes,
     activeInstitutes,
     pendingInstitutes,
     instituteAdmins,
-    recentInstitutes,
     totalUsers,
+    institutesLast30,
+    institutesPrev30,
+    usersLast30,
+    usersPrev30,
+    recentSignups,
+    recentActivity,
+    recentActivityFeed,
+    bloodInventoryByGroup,
   ] = await Promise.all([
     prisma.healthInstitute.count(),
 
-    prisma.healthInstitute.count({
-      where: {
-        status: "ACTIVE",
-      },
-    }),
+    prisma.healthInstitute.count({ where: { status: "ACTIVE" } }),
 
-    prisma.healthInstitute.count({
-      where: {
-        status: "PENDING",
-      },
-    }),
+    prisma.healthInstitute.count({ where: { status: "PENDING" } }),
 
     prisma.user.count({
-      where: {
-        role: "HEALTH_INSTITUTE_ADMIN",
-        isActive: true,
-      },
-    }),
-
-    prisma.healthInstitute.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 5,
+      where: { role: "HEALTH_INSTITUTE_ADMIN", isActive: true },
     }),
 
     prisma.user.count(),
+
+    prisma.healthInstitute.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+
+    prisma.healthInstitute.count({
+      where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
+    }),
+
+    prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+
+    prisma.user.count({
+      where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
+    }),
+
+    prisma.user.findMany({
+      where: { createdAt: { gte: fourteenDaysAgo } },
+      select: { createdAt: true },
+    }),
+
+    prisma.auditLog.findMany({
+      where: { createdAt: { gte: thirtyDaysAgo } },
+      select: { createdAt: true },
+      take: 2000,
+    }),
+
+    prisma.auditLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 7,
+      include: {
+        actor: { select: { firstName: true, lastName: true } },
+      },
+    }),
+
+    prisma.bloodInventory.groupBy({
+      by: ["bloodGroup"],
+      _sum: { units: true },
+    }),
   ]);
 
-  return (
-    <main className="min-h-screen bg-slate-100 p-4">
-      <section className="mx-auto max-w-7xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-
-        <header className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <Link href="/system-admin" className="flex items-center gap-3">
-
-            <div
-              style={{ backgroundColor: PRIMARY_RED }}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-white"
-            >
-              <BloodDropIcon />
-            </div>
-
-            <div>
-              <p className="text-lg font-bold text-slate-950">
-                BloodBridge
-              </p>
-
-              <p className="text-[10px] text-slate-400">
-                System Administration
-              </p>
-            </div>
-          </Link>
-
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="text-xs font-bold text-slate-800">
-                System Administrator
-              </p>
-
-              <p className="mt-0.5 text-[10px] text-slate-400">
-                Platform administration
-              </p>
-            </div>
-
-            <div
-              style={{ backgroundColor: PRIMARY_RED }}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white"
-            >
-              SA
-            </div>
-          </div>
-        </header>
-
-        <div className="grid min-h-175 lg:grid-cols-[230px_1fr]">
-
-          <aside className="border-r border-slate-200 bg-white p-4">
-
-            <nav className="space-y-2">
-              <NavItem
-                href="/system-admin"
-                label="Dashboard"
-                icon={<DashboardIcon />}
-                active
-              />
-
-              <NavItem
-                href="/system-admin/institutes"
-                label="Health institutes"
-                icon={<HospitalIcon />}
-              />
-
-              <NavItem
-                href="/system-admin/invitations"
-                label="Invitations"
-                icon={<MailIcon />}
-              />
-
-              <NavItem
-                href="/system-admin/users"
-                label="Users"
-                icon={<UsersIcon />}
-              />
-            </nav>
-
-            <div className="mt-8 border-t border-slate-100 pt-5">
-              <p className="px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                Platform
-              </p>
-
-              <div className="mt-3 space-y-2">
-                <NavItem
-                  href="/system-admin/settings"
-                  label="Settings"
-                  icon={<SettingsIcon />}
-                />
-
-                <Link
-                  href="/login"
-                  className="flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-red-700 transition hover:bg-red-50"
-                >
-                  <LogoutIcon />
-
-                  Sign out
-                </Link>
-              </div>
-            </div>
-          </aside>
-
-          <section className="bg-slate-50/70 p-6 lg:p-8">
-
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-950">
-                  Administration
-                </p>
-
-                <h1 className="mt-2 text-3xl font-bold text-slate-950">
-                  System Admin Dashboard
-                </h1>
-
-                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                  Manage health institutes, institutional administrators and
-                  access to the BloodBridge platform.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-
-                <Link
-                  href="/system-admin/invitations/new"
-                  className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-                  <MailIcon />
-
-                  Invite admin
-                </Link>
-
-                <Link
-                  href="/system-admin/institutes/new"
-                  style={{ backgroundColor: PRIMARY_RED }}
-                  className="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-xs font-semibold text-white transition hover:brightness-125"
-                >
-                  <PlusIcon />
-
-                  Add health institute
-                </Link>
-              </div>
-            </div>
-
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-
-              <StatCard
-                label="Health institutes"
-                value={totalInstitutes.toString()}
-                helper={`${activeInstitutes} currently active`}
-                icon={<HospitalIcon />}
-              />
-
-              <StatCard
-                label="Institute admins"
-                value={instituteAdmins.toString()}
-                helper="Active institute administrators"
-                icon={<UsersIcon />}
-              />
-
-              <StatCard
-                label="Platform users"
-                value={totalUsers.toString()}
-                helper="Registered BloodBridge users"
-                icon={<UsersIcon />}
-              />
-
-              <StatCard
-                label="Pending institutes"
-                value={pendingInstitutes.toString()}
-                helper="Require administrative action"
-                icon={<ClockIcon />}
-              />
-
-            </div>
-
-            <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_340px]">
-
-              <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-
-                <div className="flex items-center justify-between border-b border-slate-100 p-5">
-
-                  <div>
-                    <h2 className="text-base font-bold text-slate-900">
-                      Health institutes
-                    </h2>
-
-                    <p className="mt-1 text-xs text-slate-500">
-                      Recently registered institutes
-                    </p>
-                  </div>
-
-                  <Link
-                    href="/system-admin/institutes"
-                    className="text-xs font-bold text-red-950"
-                  >
-                    View all
-                  </Link>
-
-                </div>
-
-                {recentInstitutes.length === 0 ? (
-                  <div className="px-6 py-14 text-center">
-
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
-                      <HospitalIcon />
-                    </div>
-
-                    <p className="mt-4 text-sm font-bold text-slate-800">
-                      No health institutes registered
-                    </p>
-
-                    <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-slate-500">
-                      Register your first health institute to begin managing
-                      institutional access to BloodBridge.
-                    </p>
-
-                    <Link
-                      href="/system-admin/institutes/new"
-                      style={{ backgroundColor: PRIMARY_RED }}
-                      className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-semibold text-white"
-                    >
-                      <PlusIcon />
-
-                      Add health institute
-                    </Link>
-
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-100">
-
-                    {recentInstitutes.map((institute) => (
-                      <Link
-                        key={institute.id}
-                        href={`/system-admin/institutes/${institute.id}`}
-                        className="flex flex-col gap-4 p-5 transition hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between"
-                      >
-
-                        <div className="flex min-w-0 items-center gap-4">
-
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-950">
-                            <HospitalIcon />
-                          </div>
-
-                          <div className="min-w-0">
-
-                            <div className="flex flex-wrap items-center gap-2">
-
-                              <p className="text-sm font-bold text-slate-900">
-                                {institute.name}
-                              </p>
-
-                              <InstituteStatus
-                                status={institute.status}
-                              />
-
-                            </div>
-
-                            <p className="mt-1 text-xs text-slate-500">
-                              {institute.city}
-                              {institute.region
-                                ? `, ${institute.region}`
-                                : ""}
-                            </p>
-
-                            {institute.email && (
-                              <p className="mt-1 text-[11px] text-slate-400">
-                                {institute.email}
-                              </p>
-                            )}
-
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-
-                          <div className="hidden text-right sm:block">
-
-                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                              Registered
-                            </p>
-
-                            <p className="mt-1 text-xs font-semibold text-slate-700">
-                              {formatDate(institute.createdAt)}
-                            </p>
-
-                          </div>
-
-                          <ChevronRightIcon />
-
-                        </div>
-
-                      </Link>
-                    ))}
-
-                  </div>
-                )}
-
-              </section>
-
-              <aside className="space-y-5">
-
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-                    Quick actions
-                  </p>
-
-                  <div className="mt-5 space-y-3">
-
-                    <QuickAction
-                      href="/system-admin/institutes/new"
-                      icon={<HospitalIcon />}
-                      title="Register institute"
-                      description="Add a health institute to BloodBridge."
-                    />
-
-                    <QuickAction
-                      href="/system-admin/invitations/new"
-                      icon={<MailIcon />}
-                      title="Invite institute admin"
-                      description="Create an administrator invitation."
-                    />
-
-                    <QuickAction
-                      href="/system-admin/users"
-                      icon={<UsersIcon />}
-                      title="Manage users"
-                      description="Review registered user accounts."
-                    />
-
-                  </div>
-                </div>
-
-                <div
-                  style={{ backgroundColor: PRIMARY_RED }}
-                  className="rounded-3xl p-5 text-white"
-                >
-
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
-                    <ShieldIcon />
-                  </div>
-
-                  <p className="mt-4 text-base font-bold">
-                    Institutional access
-                  </p>
-
-                  <p className="mt-2 text-xs leading-5 text-red-100/80">
-                    Health Institute Admin accounts are created through
-                    invitation and linked to an approved health institute.
-                  </p>
-
-                </div>
-
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-
-                  <div className="flex items-center justify-between">
-
-                    <div>
-
-                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-                        Active institutes
-                      </p>
-
-                      <p className="mt-3 text-3xl font-bold text-slate-950">
-                        {activeInstitutes}
-                      </p>
-
-                    </div>
-
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                      <HospitalIcon />
-                    </div>
-
-                  </div>
-
-                  <p className="mt-3 text-xs leading-5 text-slate-500">
-                    {totalInstitutes === 0
-                      ? "No health institutes have been registered yet."
-                      : `${activeInstitutes} of ${totalInstitutes} registered institutes are currently active.`}
-                  </p>
-
-                  <Link
-                    href="/system-admin/institutes"
-                    className="mt-4 inline-flex text-xs font-bold text-red-950"
-                  >
-                    Manage institutes
-                  </Link>
-
-                </div>
-
-              </aside>
-
-            </div>
-
-          </section>
-
-        </div>
-
-      </section>
-    </main>
+  const institutesTrend = percentChange(institutesLast30, institutesPrev30);
+  const usersTrend = percentChange(usersLast30, usersPrev30);
+  const signupSeries = bucketByDay(
+    recentSignups.map((row) => row.createdAt),
+    14,
   );
-}
+  const activityByWeekday = weekdayCounts(recentActivity.map((row) => row.createdAt));
 
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
+  const activityItems: ActivityItem[] = recentActivityFeed.map((log) => {
+    const meta = activityMeta[log.action] ?? {
+      verb: "performed an action",
+      badgeClassName: "bg-slate-100 text-slate-500",
+      icon: <ClockIcon />,
+    };
 
-function NavItem({
-  href,
-  label,
-  icon,
-  active = false,
-}: {
-  href: string;
-  label: string;
-  icon: React.ReactNode;
-  active?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      style={
-        active
-          ? {
-              backgroundColor: PRIMARY_RED,
-            }
-          : undefined
-      }
-      className={`flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${
-        active
-          ? "text-white"
-          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-      }`}
-    >
-      {icon}
+    const actorName = log.actor
+      ? `${log.actor.firstName} ${log.actor.lastName}`
+      : "System";
 
-      {label}
-    </Link>
+    return {
+      id: log.id,
+      title: actorName,
+      subtitle: meta.verb,
+      time: formatRelativeTime(log.createdAt),
+      badgeClassName: meta.badgeClassName,
+      icon: meta.icon,
+    };
+  });
+
+  const bloodSupplySegments = bloodInventoryByGroup
+    .map((row) => ({
+      label: bloodGroupLabels[row.bloodGroup] ?? row.bloodGroup,
+      value: row._sum.units ?? 0,
+      color: bloodGroupColors[row.bloodGroup] ?? "oklch(60% 0.05 250)",
+    }))
+    .sort((a, b) => b.value - a.value);
+
+  const totalBloodUnits = bloodSupplySegments.reduce(
+    (sum, segment) => sum + segment.value,
+    0,
   );
-}
 
-function StatCard({
-  label,
-  value,
-  helper,
-  icon,
-}: {
-  label: string;
-  value: string;
-  helper: string;
-  icon: React.ReactNode;
-}) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-
-      <div className="flex items-start justify-between gap-4">
+    <>
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
 
         <div>
-
-          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
-            {label}
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-950">
+            Administration
           </p>
 
-          <p className="mt-3 text-3xl font-bold text-slate-950">
-            {value}
-          </p>
+          <h1 className="mt-2 text-3xl font-bold text-slate-950">
+            System Admin Dashboard
+          </h1>
 
-          <p className="mt-1 text-xs text-slate-500">
-            {helper}
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
+            Manage health institutes, institutional administrators and
+            access to the BloodBridge platform.
           </p>
-
         </div>
 
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-950">
-          {icon}
+        <div className="flex flex-wrap gap-3">
+
+          <Link
+            href="/system-admin/invitations/new"
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            <MailIcon />
+
+            Invite admin
+          </Link>
+
+          <Link
+            href="/system-admin/institutes/new"
+            style={{ backgroundColor: PRIMARY_RED }}
+            className="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-xs font-semibold text-white transition hover:brightness-125"
+          >
+            <PlusIcon />
+
+            Add health institute
+          </Link>
         </div>
+      </div>
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
+        <KpiCard
+          label="Health institutes"
+          value={totalInstitutes.toString()}
+          delta={institutesTrend?.delta}
+          trend={institutesTrend?.trend}
+          icon={<HospitalIcon />}
+        />
+
+        <KpiCard
+          label="Institute admins"
+          value={instituteAdmins.toString()}
+          delta={`${activeInstitutes} active institutes`}
+          trend="flat"
+          icon={<UsersIcon />}
+        />
+
+        <KpiCard
+          label="Platform users"
+          value={totalUsers.toString()}
+          delta={usersTrend?.delta}
+          trend={usersTrend?.trend}
+          icon={<UsersIcon />}
+        />
+
+        <KpiCard
+          label="Pending institutes"
+          value={pendingInstitutes.toString()}
+          delta={pendingInstitutes > 0 ? "Needs review" : "All clear"}
+          trend={pendingInstitutes > 0 ? "down" : "up"}
+          icon={<ClockIcon />}
+        />
 
       </div>
 
-    </div>
-  );
-}
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_340px]">
 
-function InstituteStatus({
-  status,
-}: {
-  status: "ACTIVE" | "PENDING" | "INACTIVE";
-}) {
-  if (status === "ACTIVE") {
-    return (
-      <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
-        Active
-      </span>
-    );
-  }
+        <DashboardCard
+          title="Platform growth"
+          action={
+            <span className="text-[11px] font-semibold text-slate-400">
+              New signups, last 14 days
+            </span>
+          }
+        >
+          <TrendAreaChart data={signupSeries} color={PRIMARY_RED} />
+        </DashboardCard>
 
-  if (status === "PENDING") {
-    return (
-      <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-700">
-        Pending
-      </span>
-    );
-  }
-
-  return (
-    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">
-      Inactive
-    </span>
-  );
-}
-
-function QuickAction({
-  href,
-  icon,
-  title,
-  description,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex items-start gap-3 rounded-2xl border border-slate-100 p-3 transition hover:border-slate-200 hover:bg-slate-50"
-    >
-
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-950">
-        {icon}
-      </div>
-
-      <div>
-
-        <p className="text-xs font-bold text-slate-800">
-          {title}
-        </p>
-
-        <p className="mt-1 text-[11px] leading-5 text-slate-500">
-          {description}
-        </p>
+        <DashboardCard title="Most active day">
+          <WeekdayBarChart data={activityByWeekday} color={PRIMARY_RED} />
+          <p className="mt-3 text-[11px] leading-5 text-slate-400">
+            Platform actions logged in the last 30 days.
+          </p>
+        </DashboardCard>
 
       </div>
 
-    </Link>
-  );
-}
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_340px]">
 
-function BloodDropIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <path d="M12 3.5c2.8 3.8 7 8.9 7 12.5a7 7 0 1 1-14 0c0-3.6 4.2-8.7 7-12.5Z" />
-    </svg>
-  );
-}
+        <DashboardCard
+          title="Recent platform activity"
+          action={
+            <Link
+              href="/system-admin/logs"
+              className="text-[11px] font-bold text-red-950"
+            >
+              View all
+            </Link>
+          }
+        >
+          <ActivityFeed items={activityItems} />
+        </DashboardCard>
 
-function DashboardIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <rect x="4" y="4" width="6" height="6" rx="1" />
-      <rect x="14" y="4" width="6" height="6" rx="1" />
-      <rect x="4" y="14" width="6" height="6" rx="1" />
-      <rect x="14" y="14" width="6" height="6" rx="1" />
-    </svg>
+        <DashboardCard
+          title="Blood supply by group"
+          action={
+            <span className="text-[11px] font-semibold text-slate-400">
+              {totalBloodUnits} units
+            </span>
+          }
+        >
+          {totalBloodUnits === 0 ? (
+            <div className="flex flex-col items-center py-6 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-950">
+                <DropletIcon />
+              </div>
+
+              <p className="mt-3 text-xs font-semibold text-slate-500">
+                No inventory recorded across institutes yet.
+              </p>
+            </div>
+          ) : (
+            <BreakdownBar segments={bloodSupplySegments} />
+          )}
+        </DashboardCard>
+
+      </div>
+    </>
   );
 }
 
@@ -694,57 +385,6 @@ function MailIcon() {
   );
 }
 
-function SettingsIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <circle cx="12" cy="12" r="3" />
-
-      <path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a7 7 0 0 0-1.7-1L14.5 3h-5L9 6.1a7 7 0 0 0-1.7 1l-2.4-1-2 3.4L5 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a7 7 0 0 0 1.7 1l.4 3.1h5l.4-3.1a7 7 0 0 0 1.7-1l2.4 1 2-3.4L19 13a7 7 0 0 0 0-1Z" />
-    </svg>
-  );
-}
-
-function LogoutIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <path d="M10 5H5v14h5" />
-      <path d="M14 8l4 4-4 4M18 12H9" />
-    </svg>
-  );
-}
-
-function ShieldIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <path d="M12 3 20 6v5c0 5-3.2 8.5-8 10-4.8-1.5-8-5-8-10V6l8-3Z" />
-
-      <path
-        d="m9 12 2 2 4-4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function PlusIcon() {
   return (
     <svg
@@ -781,20 +421,60 @@ function ClockIcon() {
   );
 }
 
-function ChevronRightIcon() {
+function CalendarIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-5 w-5 text-slate-300"
+      className="h-4.5 w-4.5"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth="1.8"
     >
-      <path
-        d="m9 6 6 6-6 6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <rect x="3.5" y="5" width="17" height="16" rx="2" />
+      <path d="M8 3v4M16 3v4M3.5 10h17" />
+    </svg>
+  );
+}
+
+function HeartIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4.5 w-4.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path d="M12 20.5s-7.5-4.6-9.7-9.2C.7 7.8 2.6 4.5 6 4.5c2 0 3.5 1.1 4.2 2.3.5-.9 2.2-2.3 4.2-2.3 3.4 0 5.3 3.3 3.7 6.8-2.2 4.6-9.7 9.2-9.7 9.2Z" />
+    </svg>
+  );
+}
+
+function DropletIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4.5 w-4.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path d="M12 3.5c2.8 3.8 7 8.9 7 12.5a7 7 0 1 1-14 0c0-3.6 4.2-8.7 7-12.5Z" />
+    </svg>
+  );
+}
+
+function AwardIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4.5 w-4.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <circle cx="12" cy="9" r="5.5" />
+      <path d="M9 13.5 7.5 21l4.5-2.5 4.5 2.5-1.5-7.5" />
     </svg>
   );
 }

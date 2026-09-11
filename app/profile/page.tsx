@@ -191,7 +191,7 @@ export default function ProfilePage() {
 
   return (
     <main className="min-h-screen bg-slate-100 p-4">
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto max-w-375">
         <ProfileHeader
           firstName={profile.firstName}
         />
@@ -611,7 +611,7 @@ function ProfileHeader({
         </Link>
 
         <Link
-          href="/donor"
+          href="/home"
           className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
         >
           Dashboard

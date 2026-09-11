@@ -85,7 +85,7 @@ export default function DonationHistoryPage() {
 
   return (
     <main className="min-h-screen bg-slate-100 p-4">
-      <section className="mx-auto max-w-7xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <section className="mx-auto max-w-375 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <header className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
           <Link href="/home" className="flex items-center gap-3">
             <div

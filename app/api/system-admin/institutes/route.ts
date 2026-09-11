@@ -1,7 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../src/lib/prisma";
+import { getAuthenticatedUser } from "../../../../src/lib/auth";
+import { logAudit } from "../../../../src/lib/audit";
 
-export async function GET() {
+async function requireSystemAdmin(request: NextRequest) {
+  const authentication = await getAuthenticatedUser(request);
+
+  if (
+    !authentication.user ||
+    authentication.user.role !== "SYSTEM_ADMIN"
+  ) {
+    return null;
+  }
+
+  return authentication.user;
+}
+
+export async function GET(request: NextRequest) {
+  const admin = await requireSystemAdmin(request);
+
+  if (!admin) {
+    return NextResponse.json(
+      { error: "Only system administrators can view health institutes." },
+      { status: 403 },
+    );
+  }
+
   try {
     const institutes = await prisma.healthInstitute.findMany({
       orderBy: {
@@ -32,6 +56,15 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const admin = await requireSystemAdmin(request);
+
+  if (!admin) {
+    return NextResponse.json(
+      { error: "Only system administrators can create health institutes." },
+      { status: 403 },
+    );
+  }
+
   try {
     const body = await request.json();
 
@@ -87,6 +120,14 @@ export async function POST(request: NextRequest) {
         status: "ACTIVE",
         isActive: true,
       },
+    });
+
+    await logAudit({
+      actorId: admin.id,
+      action: "INSTITUTE_CREATED",
+      targetType: "HealthInstitute",
+      targetId: institute.id,
+      metadata: { name: institute.name, city: institute.city },
     });
 
     return NextResponse.json(

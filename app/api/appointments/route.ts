@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { getAuthenticatedDonor } from "@/src/lib/auth";
+import { notifyUser } from "@/src/lib/notifications";
 
 export async function GET(request: NextRequest) {
   try {
@@ -127,6 +128,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Second verification gate (matches the "book donation appointment"
+    // activity diagram): a donor cannot book unless the DBMS-recorded
+    // eligibility check has already passed. The donor must complete the
+    // eligibility questionnaire (POST /api/eligibility) first.
+    const donorProfile = await prisma.donorProfile.findUnique({
+      where: { userId: authentication.user.id },
+      select: { eligibilityStatus: true },
+    });
+
+    if (!donorProfile || donorProfile.eligibilityStatus !== true) {
+      return NextResponse.json(
+        {
+          error:
+            "Please complete and pass the eligibility check before booking an appointment.",
+          eligibilityRequired: true,
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
     const appointment = await prisma.appointment.create({
       data: {
         donorId: authentication.user.id,
@@ -149,6 +172,17 @@ export async function POST(request: NextRequest) {
           },
         },
       },
+    });
+
+    await notifyUser({
+      userId: authentication.user.id,
+      type: "APPOINTMENT",
+      title: "Appointment booked",
+      message: `Your donation appointment at ${appointment.healthInstitute.name} on ${appointment.appointmentDate.toLocaleDateString(
+        "en-GB",
+        { day: "numeric", month: "long", year: "numeric" }
+      )} at ${appointment.appointmentTime} is confirmed.`,
+      link: "/appointments",
     });
 
     return NextResponse.json(

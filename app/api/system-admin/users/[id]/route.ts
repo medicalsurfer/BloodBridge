@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { prisma } from "../../../../../src/lib/prisma";
+import { logAudit } from "../../../../../src/lib/audit";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -146,6 +147,14 @@ export async function PATCH(
         isActive: true,
         createdAt: true,
       },
+    });
+
+    await logAudit({
+      actorId: currentUserId,
+      action: "USER_UPDATED",
+      targetType: "User",
+      targetId: user.id,
+      metadata: { isActive: user.isActive },
     });
 
     return NextResponse.json(

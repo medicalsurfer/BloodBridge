@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { getAuthenticatedUserFromToken } from "@/src/lib/auth";
 import { prisma } from "@/src/lib/prisma";
 
 const PRIMARY_RED = "oklch(27.1% 0.105 12.094)";
@@ -6,6 +9,22 @@ const PRIMARY_RED = "oklch(27.1% 0.105 12.094)";
 export const dynamic = "force-dynamic";
 
 export default async function InstitutesPage() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("bloodbridge_session")?.value;
+
+  if (!token) {
+    redirect("/login");
+  }
+
+  const authentication = await getAuthenticatedUserFromToken(token);
+
+  if (
+    !authentication.user ||
+    authentication.user.role !== "SYSTEM_ADMIN"
+  ) {
+    redirect("/home");
+  }
+
   const institutes = await prisma.healthInstitute.findMany({
     orderBy: {
       createdAt: "desc",
@@ -13,8 +32,7 @@ export default async function InstitutesPage() {
   });
 
   return (
-    <main className="min-h-screen bg-slate-100 p-6">
-      <section className="mx-auto max-w-6xl">
+    <>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-950">
@@ -134,17 +152,7 @@ export default async function InstitutesPage() {
             </div>
           )}
         </div>
-
-        <div className="mt-6">
-          <Link
-            href="/system-admin"
-            className="text-sm font-semibold text-slate-600"
-          >
-            Back to dashboard
-          </Link>
-        </div>
-      </section>
-    </main>
+    </>
   );
 }
 

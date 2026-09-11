@@ -99,15 +99,15 @@ if (!isAllowedEmail(normalizedEmail)) {
       console.log("LOGIN SUCCESSFUL");
       console.log("LOGGED IN USER:", data.user);
 
-      setMessage(
-        `Welcome back, ${
-          data?.user?.firstName ?? "Donor"
-        }! Login successful.`
-          const destination =
+      const destination =
         data?.redirectTo ??
         (data?.user?.role === "SYSTEM_ADMIN"
           ? "/system-admin"
           : "/home");
+
+      setMessage(
+        `Welcome back, ${data?.user?.firstName ?? "Donor"}! Login successful.`
+      );
 
       router.replace(destination);
     } catch (fetchError) {
@@ -144,7 +144,7 @@ if (!isAllowedEmail(normalizedEmail)) {
 
                   <p className="mt-2 text-sm leading-6 text-slate-500">
                     Enter your account details to access your BloodBridge
-                    donor account.
+                    workspace.
                   </p>
                 </div>
 

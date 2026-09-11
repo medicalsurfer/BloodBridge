@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 type UserRole =
@@ -220,17 +221,16 @@ export default function ManageUsersPage() {
 
   if (isLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="flex items-center justify-center py-24">
         <p className="text-sm font-medium text-slate-500">
           Loading platform users...
         </p>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 lg:p-8">
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto max-w-375">
         <div className="mb-8">
           <p className="text-sm font-medium text-slate-500">
             System administration
@@ -240,9 +240,17 @@ export default function ManageUsersPage() {
             Manage users
           </h1>
 
-          <p className="mt-2 text-sm text-slate-600">
-            View platform accounts and control whether each account can access BloodBridge.
-          </p>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <p className="mt-2 text-sm text-slate-600">
+              View platform accounts and control whether each account can access BloodBridge.
+            </p>
+            <Link
+              href="/system-admin/invitations/new"
+              className="rounded-xl bg-red-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-900"
+            >
+              Invite institute admin
+            </Link>
+          </div>
         </div>
 
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -447,7 +455,6 @@ export default function ManageUsersPage() {
           )}
         </div>
       </div>
-    </main>
   );
 }
 

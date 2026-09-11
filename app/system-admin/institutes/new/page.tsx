@@ -74,7 +74,6 @@ export default function NewHealthInstitutePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 p-6">
       <section className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
 
         <div className="mb-8">
@@ -173,7 +172,6 @@ export default function NewHealthInstitutePage() {
           </div>
         </form>
       </section>
-    </main>
   );
 }
 

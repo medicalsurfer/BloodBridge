@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../../src/lib/prisma";
+import { getAuthenticatedUser } from "../../../../../src/lib/auth";
+import { logAudit } from "../../../../../src/lib/audit";
 
 export async function PATCH(
   request: NextRequest,
@@ -7,6 +9,22 @@ export async function PATCH(
     params: Promise<{ id: string }>;
   }
 ) {
+  const authentication = await getAuthenticatedUser(request);
+
+  if (
+    !authentication.user ||
+    authentication.user.role !== "SYSTEM_ADMIN"
+  ) {
+    return NextResponse.json(
+      {
+        error: "Only system administrators can update institute status.",
+      },
+      {
+        status: 403,
+      }
+    );
+  }
+
   try {
     const { id } = await context.params;
     const body = await request.json();
@@ -30,6 +48,14 @@ export async function PATCH(
         isActive: body.isActive,
         status: body.isActive ? "ACTIVE" : "INACTIVE",
       },
+    });
+
+    await logAudit({
+      actorId: authentication.user.id,
+      action: "INSTITUTE_STATUS_CHANGED",
+      targetType: "HealthInstitute",
+      targetId: institute.id,
+      metadata: { isActive: institute.isActive, status: institute.status },
     });
 
     return NextResponse.json({

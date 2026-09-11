@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { SignJWT } from "jose";
 import { getUserByEmail } from "../../../src/lib/prisma";
+import { logAudit } from "../../../src/lib/audit";
 
 const authSecret = process.env.AUTH_SECRET;
 
@@ -16,6 +17,18 @@ function isAllowedEmail(email: string) {
   const domain = normalizedEmail.split("@")[1];
 
   return domain === "gmail.com" || domain === "icloud.com";
+}
+
+function getRedirectPath(role: string) {
+  const redirectPaths: Record<string, string> = {
+    DONOR: "/home",
+    MEDICAL_STAFF: "/portal/medical-staff",
+    LAB_TECHNICIAN: "/portal/lab-technician",
+    HEALTH_INSTITUTE_ADMIN: "/portal/institute-admin",
+    SYSTEM_ADMIN: "/system-admin",
+  };
+
+  return redirectPaths[role] ?? "/home";
 }
 
 export async function POST(request: NextRequest) {
@@ -91,10 +104,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json(
       {
         message: "Login successful.",
-        redirectTo:
-          user.role === "SYSTEM_ADMIN"
-            ? "/system-admin"
-            : "/home",
+        redirectTo: getRedirectPath(user.role),
         user: {
           id: user.id,
           email: user.email,
@@ -116,6 +126,13 @@ export async function POST(request: NextRequest) {
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
+    });
+
+    await logAudit({
+      actorId: user.id,
+      action: "USER_LOGGED_IN",
+      targetType: "User",
+      targetId: user.id,
     });
 
     return response;
