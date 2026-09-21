@@ -16,6 +16,16 @@ const eslintConfig = defineConfig([
     "src/generated/**",
   ]),
   {
+    // `jest.mock()` is hoisted above the imports in a file, so its factory
+    // cannot close over an imported binding - the mock has to pull the
+    // replacement in with require() at call time. That is the documented way
+    // to write it, so the rule is relaxed for test files only.
+    files: ["tests/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+  {
     // SQL injection guard (SRS §9). Prisma's query API and its tagged-template
     // raw helpers always send values as bound parameters. The *Unsafe helpers
     // take a SQL string instead, which is the only way this codebase could

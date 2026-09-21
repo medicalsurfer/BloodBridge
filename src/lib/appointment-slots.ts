@@ -1,6 +1,8 @@
 // Appointment slot rules shared by the booking/reschedule screens and the API.
 // Pure module: safe to import from client components.
 
+import { dateString } from "./input";
+
 export const APPOINTMENT_TIMES = [
   "08:00",
   "09:00",
@@ -30,14 +32,16 @@ export function validateSchedule(
   date: unknown,
   time: unknown,
 ): { date: Date; time: string; error?: undefined } | { error: string } {
-  if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  // dateString rejects a day that never existed, which a plain parse would
+  // roll forward instead: without it a submitted "2026-06-31" books 1 July.
+  const validDate = dateString(date);
+  if (!validDate) {
     return { error: "Choose a valid appointment date." };
   }
 
-  const parsed = new Date(`${date}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
-    return { error: "Choose a valid appointment date." };
-  }
+  // Local midnight, not the UTC instant dateString parsed: the checks below
+  // and the stored appointment date are all in the centre's local days.
+  const parsed = new Date(`${validDate}T00:00:00`);
 
   if (typeof time !== "string" || !(APPOINTMENT_TIMES as readonly string[]).includes(time)) {
     return { error: "Choose one of the available appointment times." };

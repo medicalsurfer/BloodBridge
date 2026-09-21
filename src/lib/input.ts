@@ -35,6 +35,12 @@ export function oneOf<T extends string>(value: unknown, allowed: readonly T[]): 
 
 /** A whole number within [min, max], or null. */
 export function integer(value: unknown, { min = 1, max = 1_000_000 } = {}): number | null {
+  // Only a number or a numeric string is a number. `Number()` alone would
+  // also unwrap [5] to 5 and turn true into 1, so a JSON body sending an
+  // array or a boolean would pass a check that reads as a type check.
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < min || parsed > max) return null;
   return parsed;
@@ -43,5 +49,13 @@ export function integer(value: unknown, { min = 1, max = 1_000_000 } = {}): numb
 /** A date-only string (YYYY-MM-DD), or null. */
 export function dateString(value: unknown): string | null {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  return Number.isNaN(new Date(`${value}T00:00:00`).getTime()) ? null : value;
+
+  // An out-of-range day does not make `new Date` fail: it rolls forward, so
+  // "2026-02-31" parses as 3 March and "2026-06-31" as 1 July. Formatting the
+  // parsed date back and comparing is what rejects a day that never existed.
+  // Parsed as UTC so the round-trip through toISOString is timezone-safe.
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return parsed.toISOString().slice(0, 10) === value ? value : null;
 }

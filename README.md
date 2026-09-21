@@ -9,6 +9,12 @@ Web-based blood donation management platform (Next.js, TypeScript, Prisma, Postg
 3. Start the app: `npm run dev`, then open [http://localhost:3000](http://localhost:3000)
 4. Start the AI assistant in a second terminal: `npm run ai` (see below)
 
+## Tests
+
+`npm test` runs the Jest suite (`npm run test:coverage` for a coverage report).
+No database, SMTP server or AI model needs to be running. See
+[tests/README.md](tests/README.md) for how it is wired and how to add a test.
+
 ## Environment variables
 
 | Variable | Purpose |
