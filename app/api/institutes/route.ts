@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/src/lib/prisma";
 import { getAuthenticatedDonor } from "@/src/lib/auth";
+import { getActiveInstitutes, getInstitutesWithStaff } from "@/src/lib/institutes";
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,24 +13,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const institutes = await prisma.healthInstitute.findMany({
-      where: {
-        status: "ACTIVE",
-        isActive: true,
-      },
-      orderBy: {
-        name: "asc",
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phoneNumber: true,
-        address: true,
-        city: true,
-        region: true,
-      },
-    });
+    // The chat picker asks for centres that can actually reply.
+    const withStaff = new URL(request.url).searchParams.get("withStaff") === "1";
+    const institutes = withStaff ? await getInstitutesWithStaff() : await getActiveInstitutes();
 
     return NextResponse.json(
       { institutes },

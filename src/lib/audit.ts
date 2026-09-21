@@ -1,24 +1,8 @@
 import { prisma } from "./prisma";
 
-export type AuditAction =
-  | "USER_REGISTERED"
-  | "USER_LOGGED_IN"
-  | "USER_CREATED"
-  | "USER_UPDATED"
-  | "USER_DELETED"
-  | "INSTITUTE_CREATED"
-  | "INSTITUTE_UPDATED"
-  | "INSTITUTE_STATUS_CHANGED"
-  | "INSTITUTE_DELETED"
-  | "STAFF_INVITED"
-  | "STAFF_REMOVED"
-  | "APPOINTMENT_BOOKED"
-  | "APPOINTMENT_CANCELLED"
-  | "APPOINTMENT_RESCHEDULED"
-  | "DONATION_RECORDED"
-  | "BLOOD_REQUEST_CREATED"
-  | "REWARD_VALIDATED"
-  | "REWARD_REJECTED";
+import type { AuditAction } from "./audit-actions";
+
+export type { AuditAction };
 
 /**
  * Records one entry in the system audit trail (System Admin > System logs).

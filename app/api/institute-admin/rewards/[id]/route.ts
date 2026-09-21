@@ -3,6 +3,7 @@ import { prisma } from "@/src/lib/prisma";
 import { getAuthenticatedInstituteAdmin } from "@/src/lib/auth";
 import { notifyUser } from "@/src/lib/notifications";
 import { logAudit } from "@/src/lib/audit";
+import { id as isValidId } from "@/src/lib/input";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -19,7 +20,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { id } = await context.params;
+    const { id: rawId } = await context.params;
+    const id = isValidId(rawId);
+
+    if (!id) {
+      return NextResponse.json({ error: "Invalid identifier." }, { status: 400 });
+    }
     const body = await request.json();
     const decision = body.status as "VALIDATED" | "REJECTED";
 

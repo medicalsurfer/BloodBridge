@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clientIp, LIMITS, rateLimit } from "@/src/lib/rate-limit";
 import bcrypt from "bcryptjs";
 import { SignJWT } from "jose";
 import { getUserByEmail } from "../../../src/lib/prisma";
@@ -49,6 +50,11 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
+
+    const limited =
+      rateLimit(`login:ip:${clientIp(request)}`, LIMITS.login.limit * 3, LIMITS.login.windowMs) ??
+      rateLimit(`login:email:${normalizedEmail}`, LIMITS.login.limit, LIMITS.login.windowMs);
+    if (limited) return limited;
 
     if (!isAllowedEmail(normalizedEmail)) {
       return NextResponse.json(

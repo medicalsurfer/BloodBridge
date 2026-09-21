@@ -121,10 +121,9 @@ export async function PATCH(request: NextRequest) {
 
   await logAudit({
     actorId: admin.id,
-    action: "USER_UPDATED",
+    action: "PASSWORD_CHANGED",
     targetType: "User",
     targetId: admin.id,
-    metadata: { field: "password" },
   });
 
   return NextResponse.json({ message: "Password updated successfully." });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { prisma } from "../../../../../src/lib/prisma";
 import { logAudit } from "../../../../../src/lib/audit";
+import { id as isValidId } from "@/src/lib/input";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -85,7 +86,12 @@ export async function PATCH(
       );
     }
 
-    const { id } = await context.params;
+    const { id: rawId } = await context.params;
+    const id = isValidId(rawId);
+
+    if (!id) {
+      return NextResponse.json({ error: "Invalid identifier." }, { status: 400 });
+    }
 
     if (id === currentUserId) {
       return NextResponse.json(

@@ -39,6 +39,7 @@ enum InstituteStatus {
 
 enum AppointmentStatus {
   SCHEDULED
+  CONFIRMED
   COMPLETED
   CANCELLED
 }
@@ -72,6 +73,12 @@ enum RewardStatus {
   REJECTED
 }
 
+enum EligibilityStatus {
+  ELIGIBLE
+  TEMPORARILY_DEFERRED
+  MEDICAL_REVIEW
+}
+
 enum AuditAction {
   USER_REGISTERED
   USER_LOGGED_IN
@@ -87,10 +94,22 @@ enum AuditAction {
   APPOINTMENT_BOOKED
   APPOINTMENT_CANCELLED
   APPOINTMENT_RESCHEDULED
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_COMPLETED
   DONATION_RECORDED
   BLOOD_REQUEST_CREATED
+  BLOOD_REQUEST_UPDATED
+  INVENTORY_ADJUSTED
   REWARD_VALIDATED
   REWARD_REJECTED
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
+  PASSWORD_CHANGED
+}
+
+enum AiChatRole {
+  USER
+  ASSISTANT
 }
 
 model User {
@@ -119,10 +138,41 @@ model User {
   auditLogs          AuditLog[]
   donorConversations Conversation[]   @relation("DonorConversations")
   messages           Message[]
+  aiChatMessages     AiChatMessage[]
+  passwordResetTokens PasswordResetToken[]
+  eligibilityAssessments EligibilityAssessment[]
 
   @@index([email])
   @@index([healthInstituteId])
   @@map("users")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model AiChatMessage {
+  id        String     @id @default(cuid())
+  userId    String
+  role      AiChatRole
+  content   String
+  createdAt DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@map("ai_chat_messages")
 }
 
 model Notification {
@@ -211,6 +261,30 @@ model Message {
 
   @@index([conversationId])
   @@map("messages")
+}
+
+/// A single completed eligibility screening.
+///
+/// Stored rather than recomputed so that a donor who has just been screened
+/// can proceed straight to booking without answering the same questions
+/// twice, and so staff have the clinical record of what was answered. The
+/// answers are kept as a JSON snapshot of the questionnaire as it stood at
+/// the time — the question set can change, and a stored assessment must stay
+/// readable against the version the donor actually saw.
+model EligibilityAssessment {
+  id            String            @id @default(cuid())
+  donorId       String
+  status        EligibilityStatus
+  eligible      Boolean
+  reasons       String[]
+  answers       Json
+  daysRemaining Int               @default(0)
+  createdAt     DateTime          @default(now())
+
+  donor User @relation(fields: [donorId], references: [id], onDelete: Cascade)
+
+  @@index([donorId, createdAt])
+  @@map("eligibility_assessments")
 }
 
 model DonorProfile {

@@ -106,6 +106,165 @@ export async function sendInstituteAdminInvitationEmail({
   }
 }
 
+export async function sendPasswordResetEmail({
+  recipient,
+  firstName,
+  resetLink,
+}: {
+  recipient: string;
+  firstName: string;
+  resetLink: string;
+}) {
+  const from = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? process.env.EMAIL_USER;
+
+  if (!from) {
+    throw new Error("Email delivery is not configured. Set SMTP_USER and SMTP_PASSWORD.");
+  }
+
+  const transport = getMailTransport();
+  const greeting = `Hello ${firstName},`;
+  const intro = "We received a request to reset your BloodBridge password. This link expires in 1 hour.";
+
+  try {
+    await transport.sendMail({
+      from,
+      to: recipient,
+      replyTo: from,
+      subject: "Reset your BloodBridge password",
+      text: [
+        greeting,
+        "",
+        intro,
+        "",
+        resetLink,
+        "",
+        "If you did not request this, you can safely ignore this email.",
+      ].join("\n"),
+      html: [
+        `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:480px;margin:0 auto;">`,
+        `<p style="font-weight:bold;font-size:18px;color:#7f1d1d;margin:0 0 16px;">BloodBridge</p>`,
+        `<p>${escapeHtml(greeting)}</p>`,
+        `<p>${escapeHtml(intro)}</p>`,
+        `<p style="margin:24px 0;"><a href="${resetLink}" style="background:#7f1d1d;color:#ffffff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold;">Reset password</a></p>`,
+        `<p style="color:#6b7280;font-size:13px;">If you did not request this, you can safely ignore this email.</p>`,
+        `</div>`,
+      ].join(""),
+    });
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "EAUTH") {
+      throw new Error(
+        "Gmail rejected the SMTP credentials. Use a 16-character Gmail App Password in SMTP_PASSWORD."
+      );
+    }
+
+    throw error;
+  } finally {
+    transport.close();
+  }
+}
+
+export async function sendAppointmentConfirmationEmail({
+  recipient,
+  firstName,
+  instituteName,
+  appointmentDate,
+  appointmentTime,
+}: {
+  recipient: string;
+  firstName: string;
+  instituteName: string;
+  appointmentDate: string;
+  appointmentTime: string;
+}) {
+  const from = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? process.env.EMAIL_USER;
+
+  if (!from) {
+    throw new Error("Email delivery is not configured. Set SMTP_USER and SMTP_PASSWORD.");
+  }
+
+  const transport = getMailTransport();
+  const greeting = `Hello ${firstName},`;
+  const intro = `Your donation appointment at ${instituteName} on ${appointmentDate} at ${appointmentTime} is confirmed.`;
+
+  try {
+    await transport.sendMail({
+      from,
+      to: recipient,
+      replyTo: from,
+      subject: "Your BloodBridge appointment is confirmed",
+      text: [
+        greeting,
+        "",
+        intro,
+        "",
+        "Please bring a valid form of identification and arrive a few minutes early.",
+      ].join("\n"),
+      html: [
+        `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:480px;margin:0 auto;">`,
+        `<p style="font-weight:bold;font-size:18px;color:#7f1d1d;margin:0 0 16px;">BloodBridge</p>`,
+        `<p>${escapeHtml(greeting)}</p>`,
+        `<p>${escapeHtml(intro)}</p>`,
+        `<p style="color:#6b7280;font-size:13px;">Please bring a valid form of identification and arrive a few minutes early.</p>`,
+        `</div>`,
+      ].join(""),
+    });
+  } finally {
+    transport.close();
+  }
+}
+
+export async function sendBloodRequestAlertEmail({
+  recipient,
+  firstName,
+  instituteName,
+  bloodGroup,
+  unitsNeeded,
+  urgency,
+}: {
+  recipient: string;
+  firstName: string;
+  instituteName: string;
+  bloodGroup: string;
+  unitsNeeded: number;
+  urgency: string;
+}) {
+  const from = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? process.env.EMAIL_USER;
+
+  if (!from) {
+    throw new Error("Email delivery is not configured. Set SMTP_USER and SMTP_PASSWORD.");
+  }
+
+  const transport = getMailTransport();
+  const greeting = `Hello ${firstName},`;
+  const intro = `${instituteName} has an open ${urgency.toLowerCase()}-priority request for ${unitsNeeded} unit${unitsNeeded === 1 ? "" : "s"} of ${bloodGroup.replace("_", " ")} blood, matching your donor profile.`;
+
+  try {
+    await transport.sendMail({
+      from,
+      to: recipient,
+      replyTo: from,
+      subject: `${urgency.charAt(0)}${urgency.slice(1).toLowerCase()} priority blood request matches your blood type`,
+      text: [
+        greeting,
+        "",
+        intro,
+        "",
+        "Sign in to BloodBridge to view this request and book a donation appointment if you are able to help.",
+      ].join("\n"),
+      html: [
+        `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:480px;margin:0 auto;">`,
+        `<p style="font-weight:bold;font-size:18px;color:#7f1d1d;margin:0 0 16px;">BloodBridge</p>`,
+        `<p>${escapeHtml(greeting)}</p>`,
+        `<p>${escapeHtml(intro)}</p>`,
+        `<p style="color:#6b7280;font-size:13px;">Sign in to BloodBridge to view this request and book a donation appointment if you are able to help.</p>`,
+        `</div>`,
+      ].join(""),
+    });
+  } finally {
+    transport.close();
+  }
+}
+
 export async function sendStaffInvitationEmail({
   recipient,
   firstName,
@@ -146,6 +305,37 @@ export async function sendStaffInvitationEmail({
         "Please change this temporary password after signing in.",
       ].join("\n"),
       html: buildInvitationHtml({ greeting, intro, recipient, temporaryPassword }),
+    });
+  } finally {
+    transport.close();
+  }
+}
+
+// Used by System admin > Account settings to confirm SMTP is configured.
+export async function sendTestEmail({ recipient, firstName }: { recipient: string; firstName: string }) {
+  const from = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? process.env.EMAIL_USER;
+
+  if (!from) {
+    throw new Error("Email delivery is not configured. Set SMTP_USER and SMTP_PASSWORD.");
+  }
+
+  const transport = getMailTransport();
+  const greeting = `Hello ${firstName},`;
+  const intro = "This is a test email from BloodBridge. If you can read it, email delivery is working.";
+
+  try {
+    await transport.sendMail({
+      from,
+      to: recipient,
+      subject: "BloodBridge test email",
+      text: [greeting, "", intro].join("\n"),
+      html: [
+        `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:480px;margin:0 auto;">`,
+        `<p style="font-weight:bold;font-size:18px;color:#7f1d1d;margin:0 0 16px;">BloodBridge</p>`,
+        `<p>${escapeHtml(greeting)}</p>`,
+        `<p>${escapeHtml(intro)}</p>`,
+        `</div>`,
+      ].join(""),
     });
   } finally {
     transport.close();

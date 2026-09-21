@@ -126,7 +126,7 @@ if (!isAllowedEmail(normalizedEmail)) {
   return (
     <main className="min-h-screen bg-slate-100 p-2">
       <section className="mx-auto min-h-[calc(100vh-1rem)] max-w-375 rounded-3xl border border-white bg-slate-200/70 p-2 shadow-xl">
-        <div className="grid min-h-[calc(100vh-2rem)] overflow-hidden rounded-[20px] bg-white lg:grid-cols-[1fr_1.05fr]">
+        <div className="grid min-h-[calc(100vh-2rem)] overflow-hidden rounded-2xl bg-white lg:grid-cols-[1fr_1.05fr]">
           
           {/* LEFT SIDE */}
           <div className="flex min-h-0 flex-col px-6 py-5 sm:px-10 lg:px-12 xl:px-16">
@@ -339,23 +339,13 @@ if (!isAllowedEmail(normalizedEmail)) {
                 </div>
 
                 {/* SOCIAL LOGIN BUTTONS */}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    className="flex h-12 items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    <GoogleIcon />
-                    Google
-                  </button>
-
-                  <button
-                    type="button"
-                    className="flex h-12 items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    <MicrosoftIcon />
-                    Microsoft
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                >
+                  <GoogleIcon />
+                  Google
+                </button>
 
                 {/* REGISTER LINK */}
                 <p className="mt-5 text-center text-sm text-slate-500">
@@ -433,32 +423,44 @@ function Header() {
 // Decorative donor information displayed on desktop
 function DonorPanel() {
   return (
-    <aside
-      style={{
-        backgroundColor: PRIMARY_RED,
-      }}
-      className="relative hidden min-h-0 overflow-hidden px-8 py-6 text-white lg:flex lg:h-full lg:flex-col lg:justify-center xl:px-10"
-    >
+    <aside className="relative hidden min-h-0 overflow-hidden bg-gradient-to-br from-garnet via-plum to-garnet-deep px-8 py-8 text-white lg:flex lg:h-full lg:flex-col lg:justify-center xl:px-12">
       <DecorativeBackground />
 
-      <div className="relative z-10 mx-auto flex h-full w-full max-w-170 flex-col justify-center">
-        <div className="mb-5">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-red-100 backdrop-blur-sm">
-            <span className="h-1.5 w-1.5 rounded-full bg-red-200" />
+      {/*
+        Everything is capped to the column's own width rather than a fixed
+        max-w, which used to overshoot the 1.05fr track at 1440px and clip the
+        heading. `min-w-0` lets the flex child actually shrink.
+      */}
+      <div className="relative z-10 mx-auto flex min-w-0 w-full max-w-[580px] flex-col justify-center">
+        <div className="mb-6">
+          <span
+            className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-semibold tracking-[0.14em] text-red-100 uppercase backdrop-blur-sm"
+            style={{ animation: "var(--animate-rise)", animationDelay: "80ms" }}
+          >
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gold" />
             Your donation journey
           </span>
 
-          <h2 className="mt-3 max-w-155 text-3xl font-semibold leading-[1.08] xl:text-4xl">
+          <h2
+            className="mt-4 text-[28px] leading-[1.12] font-semibold tracking-[-0.02em] text-balance xl:text-[32px]"
+            style={{ animation: "var(--animate-rise)", animationDelay: "150ms" }}
+          >
             Every donation creates another chance at life.
           </h2>
 
-          <p className="mt-2 max-w-xl text-sm leading-5 text-red-100/75">
-            Follow your eligibility, appointments and donation
-            impact from your BloodBridge donor account.
+          <p
+            className="mt-3 text-[13.5px] leading-6 text-red-100/75"
+            style={{ animation: "var(--animate-rise)", animationDelay: "220ms" }}
+          >
+            Follow your eligibility, appointments and donation impact from your BloodBridge donor
+            account.
           </p>
         </div>
 
-        <div className="w-full rounded-[26px] border border-white/20 bg-white/95 p-4 text-slate-900 shadow-2xl backdrop-blur-sm">
+        <div
+          className="w-full rounded-2xl border border-white/20 bg-white/95 p-4 text-slate-900 shadow-2xl backdrop-blur-sm"
+          style={{ animation: "var(--animate-rise)", animationDelay: "300ms" }}
+        >
           <DonorDashboardPreview />
         </div>
       </div>
@@ -852,47 +854,6 @@ function GoogleIcon() {
   );
 }
 
-function MicrosoftIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      aria-hidden="true"
-    >
-      <rect
-        x="3"
-        y="3"
-        width="7"
-        height="7"
-        fill="#F35325"
-      />
-
-      <rect
-        x="14"
-        y="3"
-        width="7"
-        height="7"
-        fill="#81BC06"
-      />
-
-      <rect
-        x="3"
-        y="14"
-        width="7"
-        height="7"
-        fill="#05A6F0"
-      />
-
-      <rect
-        x="14"
-        y="14"
-        width="7"
-        height="7"
-        fill="#FFBA08"
-      />
-    </svg>
-  );
-}
 
 function BloodDropIcon() {
   return (
@@ -911,10 +872,18 @@ function BloodDropIcon() {
 
 function DecorativeBackground() {
   return (
-    <div className="pointer-events-none absolute inset-0 opacity-30">
-      <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+    <div aria-hidden className="pointer-events-none absolute inset-0">
+      <div
+        className="absolute -top-20 -left-16 h-[340px] w-[340px] rounded-full bg-rose/20 blur-3xl"
+        style={{ animation: "var(--animate-drift)" }}
+      />
 
-      <div className="absolute bottom-0 right-0 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
+      <div
+        className="absolute -right-16 bottom-0 h-[320px] w-[320px] rounded-full bg-ember/15 blur-3xl"
+        style={{ animation: "var(--animate-drift)", animationDelay: "-7s" }}
+      />
+
+      <div className="absolute top-[12%] right-[10%] h-[200px] w-[200px] rounded-full border border-white/[0.06]" />
     </div>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Activity,
   Building2,
+  CheckCircle2,
+  MessageCircle,
+  Droplet,
   LayoutDashboard,
   Mail,
   MapPin,
@@ -13,9 +14,9 @@ import {
   ShieldCheck,
   Users,
   UserPlus,
+  XCircle,
 } from "lucide-react";
 import {
-  KpiCard,
   TrendAreaChart,
   WeekdayBarChart,
   RadialGauge,
@@ -24,8 +25,23 @@ import {
   bucketByDay,
   weekdayCounts,
 } from "@/src/components/dashboard/DashboardWidgets";
+import { PortalShell, type PortalNavGroup } from "@/src/components/dashboard/PortalShell";
+import {
+  PageHeader,
+  StatGrid,
+  Stat,
+  Panel,
+  Row,
+  RowTitle,
+  RowMeta,
+  Pill,
+  EmptyState,
+} from "@/src/components/ui/Page";
 
 const PRIMARY_RED = "oklch(27.1% 0.105 12.094)";
+
+const fieldClass =
+  "h-11 w-full rounded-xl border border-slate-300 px-3.5 text-[13.5px] transition focus:border-slate-500 focus:outline-none";
 
 type Staff = {
   id: string;
@@ -96,6 +112,39 @@ const bloodGroupColors: Record<BloodGroup, string> = {
   O_NEGATIVE: "oklch(75% 0.02 260)",
 };
 
+type Section = "dashboard" | "team" | "rewards";
+
+type RewardStatus = "PENDING" | "VALIDATED" | "REJECTED";
+
+type RewardItem = {
+  id: string;
+  points: number;
+  status: RewardStatus;
+  createdAt: string;
+  donor: { firstName: string; lastName: string; email: string };
+  donation: { donatedAt: string; bloodGroup: string; volumeMl: number } | null;
+  validatedBy: { firstName: string; lastName: string } | null;
+};
+
+const rewardBloodGroupLabels: Record<string, string> = {
+  A_POSITIVE: "A+",
+  A_NEGATIVE: "A-",
+  B_POSITIVE: "B+",
+  B_NEGATIVE: "B-",
+  AB_POSITIVE: "AB+",
+  AB_NEGATIVE: "AB-",
+  O_POSITIVE: "O+",
+  O_NEGATIVE: "O-",
+};
+
+function formatRewardDate(value: string) {
+  return new Date(value).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function InstituteAdminPage() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [institute, setInstitute] = useState<Institute | null>(null);
@@ -111,13 +160,44 @@ export default function InstituteAdminPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [activeSection, setActiveSection] = useState<"dashboard" | "team">("dashboard");
+  const [activeSection, setActiveSection] = useState<Section>("dashboard");
+  const [confirmRemoval, setConfirmRemoval] = useState<Staff | null>(null);
+
+  // Reward validation, handled in place so the admin never leaves the workspace.
+  const [rewards, setRewards] = useState<RewardItem[]>([]);
+  const [rewardFilter, setRewardFilter] = useState<RewardStatus | "ALL">("PENDING");
+  const [rewardsLoading, setRewardsLoading] = useState(true);
+  const [decidingId, setDecidingId] = useState<string | null>(null);
   const activeStaff = staff.filter((member) => member.isActive).length;
 
-  function goToSection(section: "dashboard" | "team") {
+  function goToSection(section: Section) {
     setActiveSection(section);
+    // Keep the URL in step, so the sidebar highlight and a copied link match.
+    window.history.replaceState(null, "", `#${section}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setConfirmRemoval(null);
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // Keep the section in step with the URL hash, so the sidebar links, a shared
+  // link like /portal/institute-admin#team and the browser Back button agree.
+  useEffect(() => {
+    function applyHash() {
+      const hash = window.location.hash.replace("#", "");
+      setActiveSection(hash === "team" || hash === "rewards" ? hash : "dashboard");
+    }
+
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
 
   useEffect(() => {
     loadStaff();
@@ -138,6 +218,53 @@ export default function InstituteAdminPage() {
       setInstitute(data.institute ?? null);
     }
     setLoading(false);
+  }
+
+  const loadRewards = useCallback(async () => {
+    setRewardsLoading(true);
+
+    const query = rewardFilter === "ALL" ? "" : `?status=${rewardFilter}`;
+    const response = await fetch(`/api/institute-admin/rewards${query}`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setError(data.error ?? "Unable to load rewards.");
+    } else {
+      setRewards(data.rewards ?? []);
+    }
+
+    setRewardsLoading(false);
+  }, [rewardFilter]);
+
+  useEffect(() => {
+    void loadRewards();
+  }, [loadRewards]);
+
+  async function decideReward(id: string, status: "VALIDATED" | "REJECTED") {
+    setDecidingId(id);
+    setError("");
+    setNotice("");
+
+    const response = await fetch(`/api/institute-admin/rewards/${id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setError(data.error ?? "Unable to update reward.");
+    } else {
+      setNotice(status === "VALIDATED" ? "Reward validated." : "Reward rejected.");
+      // Refresh in place rather than navigating anywhere.
+      await Promise.all([loadRewards(), loadStats()]);
+    }
+
+    setDecidingId(null);
   }
 
   async function loadStats() {
@@ -179,8 +306,7 @@ export default function InstituteAdminPage() {
   }
 
   async function deleteStaff(member: Staff) {
-    if (!window.confirm(`Delete ${member.firstName} ${member.lastName}?`)) return;
-
+    setConfirmRemoval(null);
     setRemovingId(member.id);
     setError("");
     setNotice("");
@@ -232,117 +358,233 @@ export default function InstituteAdminPage() {
 
   const staffActiveRate = staff.length === 0 ? 0 : Math.round((activeStaff / staff.length) * 100);
 
+  const instituteNav: PortalNavGroup[] = [
+    {
+      label: "Workspace",
+      links: [
+        { href: "#dashboard", label: "Dashboard", icon: <LayoutDashboard size={16} /> },
+        { href: "#team", label: "Team", icon: <Users size={16} /> },
+        { href: "#rewards", label: "Donation rewards", icon: <ShieldCheck size={16} /> },
+        { href: "/portal/chat", label: "Donor chat", icon: <MessageCircle size={16} /> },
+      ],
+    },
+    {
+      label: "Account",
+      links: [
+        {
+          href: "/portal/institute-admin/profile",
+          label: "My profile",
+          icon: <Users size={16} />,
+        },
+      ],
+    },
+  ];
+
   return (
-    <main className="min-h-screen bg-slate-100 p-4">
-      <section className="mx-auto max-w-375 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <PortalShell
+      brandHref="/portal/institute-admin"
+      title="Institute workspace"
+      subtitle={institute?.name ?? "Institute administration"}
+      navGroups={instituteNav}
+      activeHref={`#${activeSection}`}
+      onNavigate={(href) => goToSection(href.replace("#", "") as Section)}
+      accountName={institute?.name ?? "Institute administrator"}
+      accountRole="Institute admin"
+      accountHref="/portal/institute-admin/profile"
+    >
+          <div className="mx-auto max-w-7xl">
 
-        <header className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              style={{ backgroundColor: PRIMARY_RED }}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-white"
-            >
-              <Building2 size={19} />
-            </div>
-
-            <div>
-              <p className="text-lg font-bold text-slate-950">BloodBridge</p>
-              <p className="text-[10px] text-slate-400">Institute workspace</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="text-xs font-bold text-slate-800">
-                {institute?.name ?? "Institute administrator"}
-              </p>
-              <p className="mt-0.5 text-[10px] text-slate-400">Institute administration</p>
-            </div>
-
-            <div
-              style={{ backgroundColor: PRIMARY_RED }}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white"
-            >
-              IA
-            </div>
-          </div>
-        </header>
-
-        <div className="grid min-h-175 lg:grid-cols-[230px_1fr]">
-
-          <aside className="border-r border-slate-200 bg-white p-4">
-            <nav className="space-y-2">
-              <NavItem
-                label="Dashboard"
-                icon={<LayoutDashboard size={18} />}
-                active={activeSection === "dashboard"}
-                onClick={() => goToSection("dashboard")}
-              />
-              <NavItem
-                label="Team"
-                icon={<Users size={18} />}
-                active={activeSection === "team"}
-                onClick={() => goToSection("team")}
-              />
-              <NavItem href="/portal/institute-admin/rewards" label="Donation rewards" icon={<ShieldCheck size={18} />} />
-            </nav>
-
-            <div className="mt-8 border-t border-slate-100 pt-5">
-              <p className="px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                Account
-              </p>
-
-              <div className="mt-3 space-y-2">
-                <NavItem href="/portal/institute-admin/profile" label="My profile" icon={<Users size={18} />} />
-
-                <Link
-                  href="/api/logout"
-                  className="flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-red-700 transition hover:bg-red-50"
-                >
-                  <LogoutIcon />
-                  Sign out
-                </Link>
-              </div>
-            </div>
-          </aside>
-
-          <section className="bg-slate-50/70 p-6 lg:p-8">
-
-            {activeSection === "dashboard" ? (
+            {activeSection === "rewards" ? (
               <>
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                  <div>
-                    <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-red-950">
-                      <Activity size={13} strokeWidth={2.5} />
-                      Institute dashboard
-                    </p>
+                <PageHeader
+                  eyebrow="Donation rewards"
+                  title="Validate donation rewards"
+                  description="Confirm reward points earned by donors at your institute before they are credited."
+                  actions={
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => goToSection("dashboard")}
+                        className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-300 px-5 text-[13px] font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                      >
+                        <LayoutDashboard size={15} />
+                        Dashboard
+                      </button>
 
-                    <h1 className="mt-2 text-3xl font-bold text-slate-950">
-                      {institute?.name ?? "Institute workspace"}
-                    </h1>
+                      <button
+                        type="button"
+                        onClick={() => void loadRewards()}
+                        className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-300 px-5 text-[13px] font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                      >
+                        <RefreshCw size={15} />
+                        Refresh
+                      </button>
+                    </>
+                  }
+                />
 
-                    <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                      Keep your clinical team coordinated and your donation centre ready for every visit.
-                    </p>
-                  </div>
+                {error && <p className="mt-6 rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</p>}
+                {notice && (
+                  <p className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</p>
+                )}
 
-                  <button
-                    onClick={() => {
-                      loadStaff();
-                      loadStats();
-                    }}
-                    className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    <RefreshCw size={15} />
-                    Refresh
-                  </button>
+                <div className="mt-7 flex flex-wrap gap-2">
+                  {(["PENDING", "VALIDATED", "REJECTED", "ALL"] as const).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setRewardFilter(option)}
+                      className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
+                        rewardFilter === option
+                          ? "bg-red-950 text-white"
+                          : "border border-slate-300 bg-white text-slate-700 hover:border-red-300"
+                      }`}
+                    >
+                      {option === "ALL" ? "All" : option.charAt(0) + option.slice(1).toLowerCase()}
+                    </button>
+                  ))}
                 </div>
 
-                <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <KpiCard label="Team members" value={staff.length.toString()} delta={`${activeStaff} active`} trend="flat" icon={<Users size={18} />} />
-                  <KpiCard label="Donations (30 days)" value={donationsLast30.toString()} delta={`${stats?.totalDonationsCount ?? 0} all time`} trend="flat" icon={<Activity size={18} />} />
-                  <KpiCard label="Upcoming appointments" value={(stats?.upcomingAppointmentsCount ?? 0).toString()} delta="Scheduled" trend="flat" icon={<Building2 size={18} />} />
-                  <KpiCard label="Pending rewards" value={(stats?.pendingRewardsCount ?? 0).toString()} delta={`${stats?.validatedRewardsCount ?? 0} validated`} trend="flat" icon={<ShieldCheck size={18} />} />
+                <div className="mt-6">
+                  <Panel label="Reward requests" padded={false}>
+                    <div className="mt-5 border-t border-slate-100">
+                      {rewardsLoading ? (
+                        <p className="px-6 py-8 text-sm text-slate-500">Loading rewards...</p>
+                      ) : rewards.length === 0 ? (
+                        <div className="p-6">
+                          <EmptyState
+                            title="Nothing to show for this filter"
+                            description="Rewards appear here once a lab technician records a donation at your institute."
+                          />
+                        </div>
+                      ) : (
+                        rewards.map((reward) => (
+                          <Row key={reward.id}>
+                            <div className="flex min-w-0 gap-4">
+                              <div
+                                aria-hidden
+                                className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-800"
+                              >
+                                <Droplet size={17} />
+                              </div>
+
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <RowTitle>
+                                    {reward.donor.firstName} {reward.donor.lastName}
+                                  </RowTitle>
+                                  <Pill tone="good">+{reward.points} points</Pill>
+                                </div>
+
+                                <RowMeta>{reward.donor.email}</RowMeta>
+
+                                {reward.donation && (
+                                  <p className="mt-1.5 text-[11px] text-slate-400">
+                                    {rewardBloodGroupLabels[reward.donation.bloodGroup] ??
+                                      reward.donation.bloodGroup}{" "}
+                                    - {reward.donation.volumeMl}ml -{" "}
+                                    {formatRewardDate(reward.donation.donatedAt)}
+                                  </p>
+                                )}
+
+                                {reward.validatedBy && (
+                                  <p className="mt-1 text-[11px] text-slate-400">
+                                    Decided by {reward.validatedBy.firstName} {reward.validatedBy.lastName}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            {reward.status === "PENDING" ? (
+                              <div className="flex shrink-0 gap-2">
+                                <button
+                                  type="button"
+                                  disabled={decidingId === reward.id}
+                                  onClick={() => decideReward(reward.id, "VALIDATED")}
+                                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                  <CheckCircle2 size={14} />
+                                  {decidingId === reward.id ? "Saving..." : "Validate"}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={decidingId === reward.id}
+                                  onClick={() => decideReward(reward.id, "REJECTED")}
+                                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                                >
+                                  <XCircle size={14} />
+                                  Reject
+                                </button>
+                              </div>
+                            ) : (
+                              <Pill tone={reward.status === "VALIDATED" ? "good" : "neutral"}>
+                                {reward.status === "VALIDATED" ? "Validated" : "Rejected"}
+                              </Pill>
+                            )}
+                          </Row>
+                        ))
+                      )}
+                    </div>
+                  </Panel>
+                </div>
+              </>
+            ) : activeSection === "dashboard" ? (
+              <>
+                <PageHeader
+                  eyebrow="Institute dashboard"
+                  title={institute?.name ?? "Institute workspace"}
+                  description="Keep your clinical team coordinated and your donation centre ready for every visit."
+                  actions={
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => goToSection("team")}
+                        className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-300 px-5 text-[13px] font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                      >
+                        <Users size={15} />
+                        Manage team
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          loadStaff();
+                          loadStats();
+                        }}
+                        className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-300 px-5 text-[13px] font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                      >
+                        <RefreshCw size={15} />
+                        Refresh
+                      </button>
+                    </>
+                  }
+                />
+
+                <div className="mt-7">
+                  <StatGrid>
+                    <Stat
+                      label="Team members"
+                      value={staff.length.toString()}
+                      foot={`${activeStaff} active`}
+                    />
+                    <Stat
+                      label="Donations (30 days)"
+                      value={donationsLast30.toString()}
+                      foot={`${stats?.totalDonationsCount ?? 0} all time`}
+                    />
+                    <Stat
+                      label="Upcoming appointments"
+                      value={(stats?.upcomingAppointmentsCount ?? 0).toString()}
+                      foot="Scheduled"
+                    />
+                    <Stat
+                      label="Pending rewards"
+                      value={(stats?.pendingRewardsCount ?? 0).toString()}
+                      foot={`${stats?.validatedRewardsCount ?? 0} validated`}
+                      tone={(stats?.pendingRewardsCount ?? 0) > 0 ? "warn" : "default"}
+                    />
+                  </StatGrid>
                 </div>
 
                 <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_340px]">
@@ -379,150 +621,259 @@ export default function InstituteAdminPage() {
                 </div>
 
                 {institute && (
-                  <section className="mt-6 overflow-hidden rounded-3xl bg-red-950 p-6 text-white shadow-lg shadow-red-950/10 sm:p-7">
+                  <div className="mt-6 rounded-2xl bg-red-950 p-6 text-white">
                     <div className="flex flex-wrap items-start justify-between gap-5">
                       <div className="flex gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-red-100">
-                          <Building2 size={24} />
+                        <div
+                          aria-hidden
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-red-100"
+                        >
+                          <Building2 size={18} />
                         </div>
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-[0.18em] text-red-200">Assigned institute</p>
-                          <h2 className="mt-2 text-2xl font-bold">{institute.name}</h2>
-                          <div className="mt-3 space-y-1 text-sm text-red-100">
-                            <p className="flex items-center gap-2"><MapPin size={14} />{[institute.address, institute.city, institute.region].filter(Boolean).join(", ")}</p>
-                            <p className="flex flex-wrap items-center gap-x-4 gap-y-1"><span className="inline-flex items-center gap-2"><Mail size={14} />{institute.email || "No institute email"}</span><span className="inline-flex items-center gap-2"><Phone size={14} />{institute.phoneNumber || "No phone number"}</span></p>
+
+                        <div className="min-w-0">
+                          <p className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-red-200">
+                            Assigned institute
+                          </p>
+
+                          <h2 className="mt-2 text-xl font-bold tracking-[-0.02em]">
+                            {institute.name}
+                          </h2>
+
+                          <div className="mt-3 space-y-1.5 text-xs text-red-100">
+                            <p className="flex items-center gap-2">
+                              <MapPin size={13} aria-hidden />
+                              {[institute.address, institute.city, institute.region]
+                                .filter(Boolean)
+                                .join(", ")}
+                            </p>
+
+                            <p className="flex flex-wrap items-center gap-x-5 gap-y-1">
+                              <span className="inline-flex items-center gap-2">
+                                <Mail size={13} aria-hidden />
+                                {institute.email || "No institute email"}
+                              </span>
+                              <span className="inline-flex items-center gap-2">
+                                <Phone size={13} aria-hidden />
+                                {institute.phoneNumber || "No phone number"}
+                              </span>
+                            </p>
                           </div>
                         </div>
                       </div>
-                      <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/15 px-3 py-1.5 text-xs font-bold text-emerald-200"><span className="h-2 w-2 rounded-full bg-emerald-300" />Operational</span>
+
+                      <span className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-emerald-400/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-200">
+                        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                        Operational
+                      </span>
                     </div>
-                  </section>
+                  </div>
                 )}
               </>
             ) : (
               <>
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                  <div>
-                    <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-red-950">
-                      <Users size={13} strokeWidth={2.5} />
-                      Team
+                <PageHeader
+                  eyebrow="Team"
+                  title="Manage your clinical team"
+                  description="Invite medical staff and laboratory technicians, and manage who has access."
+                  actions={
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => goToSection("dashboard")}
+                        className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-300 px-5 text-[13px] font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                      >
+                        <LayoutDashboard size={15} />
+                        Dashboard
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={loadStaff}
+                        className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-300 px-5 text-[13px] font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                      >
+                        <RefreshCw size={15} />
+                        Refresh
+                      </button>
+                    </>
+                  }
+                />
+
+                {error && <p className="mt-6 rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</p>}
+                {notice && (
+                  <p className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</p>
+                )}
+
+                <div id="team" className="mt-7 grid gap-6 lg:grid-cols-[360px_1fr]">
+                  <Panel label="Build your team">
+                    <h2 className="mt-3 text-[15px] font-bold text-slate-950">Invite staff</h2>
+
+                    <p className="mt-2 text-xs leading-5 text-slate-600">
+                      Credentials are delivered securely by email.
                     </p>
 
-                    <h1 className="mt-2 text-3xl font-bold text-slate-950">
-                      Manage your clinical team
-                    </h1>
+                    <form onSubmit={inviteStaff} className="mt-5 space-y-3">
+                      <label htmlFor="inv-first" className="sr-only">
+                        First name
+                      </label>
+                      <input
+                        id="inv-first"
+                        required
+                        value={form.firstName}
+                        onChange={(event) => setForm({ ...form, firstName: event.target.value })}
+                        placeholder="First name"
+                        className={fieldClass}
+                      />
 
-                    <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                      Invite medical staff and laboratory technicians, and manage who has access.
-                    </p>
-                  </div>
+                      <label htmlFor="inv-last" className="sr-only">
+                        Last name
+                      </label>
+                      <input
+                        id="inv-last"
+                        required
+                        value={form.lastName}
+                        onChange={(event) => setForm({ ...form, lastName: event.target.value })}
+                        placeholder="Last name"
+                        className={fieldClass}
+                      />
 
-                  <button
-                    onClick={loadStaff}
-                    className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    <RefreshCw size={15} />
-                    Refresh
-                  </button>
-                </div>
+                      <label htmlFor="inv-email" className="sr-only">
+                        Work email
+                      </label>
+                      <input
+                        id="inv-email"
+                        required
+                        type="email"
+                        value={form.email}
+                        onChange={(event) => setForm({ ...form, email: event.target.value })}
+                        placeholder="Work email"
+                        className={fieldClass}
+                      />
 
-                {error && <p className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
-                {notice && <p className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700">{notice}</p>}
-
-                <div className="mt-6 grid gap-6 lg:grid-cols-[360px_1fr]">
-                  <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-900"><UserPlus size={19} /></div>
-                    <p className="mt-5 text-xs font-black uppercase tracking-[0.18em] text-red-700">Build your team</p>
-                    <h2 className="mt-2 text-xl font-black text-slate-950">Invite staff</h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-500">Credentials are delivered securely by email.</p>
-                    <form onSubmit={inviteStaff} className="mt-5 space-y-4">
-                      <input required value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} placeholder="First name" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-                      <input required value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} placeholder="Last name" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-                      <input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="Work email" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-                      <select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as Staff["role"] })} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+                      <label htmlFor="inv-role" className="sr-only">
+                        Role
+                      </label>
+                      <select
+                        id="inv-role"
+                        value={form.role}
+                        onChange={(event) =>
+                          setForm({ ...form, role: event.target.value as Staff["role"] })
+                        }
+                        className={fieldClass}
+                      >
                         <option value="MEDICAL_STAFF">Medical staff</option>
                         <option value="LAB_TECHNICIAN">Laboratory technician</option>
                       </select>
-                      <button disabled={submitting} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-800 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-900 disabled:opacity-50">
+
+                      <button
+                        disabled={submitting}
+                        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-950 text-[13px] font-semibold text-white transition hover:brightness-125 disabled:opacity-50"
+                      >
                         <UserPlus size={16} />
-                        {submitting ? "Creating invite..." : "Create invite"}
+                        {submitting ? "Creating invite…" : "Create invite"}
                       </button>
                     </form>
-                  </section>
+                  </Panel>
 
-                  <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <h2 className="text-lg font-bold text-slate-950">Staff directory</h2>
-                        <p className="mt-1 text-sm text-slate-500">{staff.length} team members</p>
-                      </div>
-                    </div>
-                    {loading ? <p className="mt-8 text-sm text-slate-500">Loading staff...</p> : staff.length === 0 ? <p className="mt-8 rounded-xl bg-slate-50 p-6 text-sm text-slate-500">No staff members have been invited yet.</p> : (
-                      <div className="mt-5 divide-y divide-slate-100">
-                        {staff.map((member) => (
-                          <div key={member.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
-                            <div>
-                              <p className="font-semibold text-slate-900">{member.firstName} {member.lastName}</p>
-                              <p className="mt-1 text-sm text-slate-500">{member.email} · {roleLabels[member.role]}</p>
+                  <Panel
+                    label="Staff directory"
+                    padded={false}
+                    action={
+                      <span className="text-[11px] tabular-nums text-slate-500">
+                        {staff.length} team member{staff.length === 1 ? "" : "s"}
+                      </span>
+                    }
+                  >
+                    <div className="mt-5 border-t border-slate-100">
+                      {loading ? (
+                        <p className="px-6 py-8 text-sm text-slate-500">Loading staff…</p>
+                      ) : staff.length === 0 ? (
+                        <div className="p-6">
+                          <EmptyState
+                            title="No staff invited yet"
+                            description="Use the invite form to add medical staff and laboratory technicians."
+                          />
+                        </div>
+                      ) : (
+                        staff.map((member) => (
+                          <Row key={member.id}>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <RowTitle>
+                                  {member.firstName} {member.lastName}
+                                </RowTitle>
+                                <Pill tone={member.isActive ? "good" : "neutral"}>
+                                  {member.isActive ? "Active" : "Inactive"}
+                                </Pill>
+                              </div>
+
+                              <RowMeta>
+                                {member.email} · {roleLabels[member.role]}
+                              </RowMeta>
                             </div>
-                            <button onClick={() => deleteStaff(member)} disabled={removingId === member.id || !member.isActive} className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50">
-                              {removingId === member.id ? "Deactivating..." : member.isActive ? "Deactivate" : "Inactive"}
+
+                            <button
+                              type="button"
+                              onClick={() => setConfirmRemoval(member)}
+                              disabled={removingId === member.id || !member.isActive}
+                              className="inline-flex h-9 shrink-0 items-center rounded-lg border border-red-200 px-3 text-xs font-semibold text-red-800 transition hover:bg-red-50 disabled:opacity-50"
+                            >
+                              {removingId === member.id
+                                ? "Deactivating…"
+                                : member.isActive
+                                  ? "Deactivate"
+                                  : "Inactive"}
                             </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
+                          </Row>
+                        ))
+                      )}
+                    </div>
+                  </Panel>
                 </div>
               </>
             )}
-          </section>
+          </div>
+      {confirmRemoval && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="remove-staff-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"
+        >
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-950">Team access</p>
+
+            <h2 id="remove-staff-title" className="mt-2 text-xl font-bold text-slate-950">
+              Deactivate this team member?
+            </h2>
+
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              {confirmRemoval.firstName} {confirmRemoval.lastName} ({confirmRemoval.email}) will lose
+              access to the {roleLabels[confirmRemoval.role]} workspace. Their past records stay intact.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5">
+              <button
+                type="button"
+                onClick={() => setConfirmRemoval(null)}
+                className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-600"
+              >
+                Keep access
+              </button>
+
+              <button
+                type="button"
+                onClick={() => deleteStaff(confirmRemoval)}
+                disabled={removingId === confirmRemoval.id}
+                className="h-10 rounded-xl bg-red-950 px-4 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                {removingId === confirmRemoval.id ? "Deactivating..." : "Yes, deactivate"}
+              </button>
+            </div>
+          </div>
         </div>
-      </section>
-    </main>
-  );
-}
+      )}
 
-function NavItem({
-  href,
-  label,
-  icon,
-  active = false,
-  onClick,
-}: {
-  href?: string;
-  label: string;
-  icon: ReactNode;
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  const className = `flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${
-    active ? "text-white" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-  }`;
-  const style = active ? { backgroundColor: PRIMARY_RED } : undefined;
-
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} style={style} className={className}>
-        {icon}
-        {label}
-      </button>
-    );
-  }
-
-  return (
-    <Link href={href ?? "#"} style={style} className={className}>
-      {icon}
-      {label}
-    </Link>
-  );
-}
-
-function LogoutIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M10 5H5v14h5" />
-      <path d="M14 8l4 4-4 4M18 12H9" />
-    </svg>
+    </PortalShell>
   );
 }

@@ -76,7 +76,7 @@ export default function AiRecommendationsPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-[#f4f1ef] p-4 sm:p-6 lg:p-8">
+    <main className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-5xl">
         <header className="mb-8 flex flex-wrap items-center justify-between gap-5">
           <div>

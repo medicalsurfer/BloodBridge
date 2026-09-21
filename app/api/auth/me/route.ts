@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { prisma } from "../../../../src/lib/prisma";
+import { MIN_DAYS_BETWEEN_DONATIONS } from "../../../../src/lib/eligibility";
 
 const authSecret = process.env.AUTH_SECRET;
 
@@ -52,8 +53,8 @@ function getNextEligibleDate(
 
   const nextDate = new Date(lastDonationDate);
 
-  // Temporary 12-week donation interval.
-  nextDate.setDate(nextDate.getDate() + 84);
+  // Same interval the eligibility check enforces.
+  nextDate.setDate(nextDate.getDate() + MIN_DAYS_BETWEEN_DONATIONS);
 
   return nextDate.toLocaleDateString("en-GB", {
     day: "numeric",
@@ -78,10 +79,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { payload } = await jwtVerify(
-      token,
-      secret
-    );
+    // Verified on its own, so only a genuine token problem is reported as an
+    // expired session. Anything failing later is a server fault, not the
+    // visitor's session, and saying otherwise sends people to log in again
+    // for no reason.
+    let payload;
+
+    try {
+      ({ payload } = await jwtVerify(token, secret));
+    } catch {
+      return NextResponse.json(
+        {
+          error: "Invalid or expired session.",
+        },
+        {
+          status: 401,
+        }
+      );
+    }
 
     const userId = payload.userId;
 
@@ -106,7 +121,7 @@ export async function GET(request: NextRequest) {
 
         appointments: {
           where: {
-            status: "SCHEDULED",
+            status: { in: ["SCHEDULED", "CONFIRMED"] },
 
             appointmentDate: {
               gte: new Date(),
@@ -148,14 +163,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Count Donation records, not completed appointments. The two diverge:
+    // a walk-in donation has no appointment, and a completed appointment does
+    // not prove blood was collected. The donation record is what institute
+    // staff actually sign off, and it is the figure /api/donations, the staff
+    // donor directory and the free-consultation entitlement all use — so this
+    // must agree with them or the donor and the reception desk see different
+    // numbers for the same entitlement.
     const completedDonations =
       user.role === "DONOR"
-        ? await prisma.appointment.count({
-            where: {
-              donorId: user.id,
-              status: "COMPLETED",
-            },
-          })
+        ? await prisma.donation.count({ where: { donorId: user.id } })
         : 0;
 
     const donorProfile =
@@ -253,10 +270,11 @@ const upcomingAppointment =
 
     return NextResponse.json(
       {
-        error: "Invalid or expired session.",
+        error:
+          "We could not load your account just now. Please try again; if it keeps happening, the server log has the details.",
       },
       {
-        status: 401,
+        status: 500,
       }
     );
   }

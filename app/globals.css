@@ -1,8 +1,244 @@
 @import "tailwindcss";
 
+/*
+  ─────────────────────────────────────────────────────────────────────────
+  BloodBridge design language — retuned centrally.
+
+  Direction: Swiss / minimal, clinical and trustworthy. Every page already
+  uses Tailwind utilities (bg-slate-100, text-slate-500, rounded-3xl,
+  shadow-sm, bg-red-950...), so retuning these theme variables restyles the
+  whole product at once instead of editing each file.
+
+  Three deliberate moves:
+  1. Neutrals go from cool blue-grey to a warm grey biased toward the brand
+     hue (30). A neutral that shares the accent's hue reads as chosen.
+  2. The red scale is re-anchored on the brand garnet at hue 12.094, so
+     `bg-red-950` is now *exactly* the brand color — utilities and the
+     inline PRIMARY_RED constant finally agree.
+  3. Radii tighten and shadows sharpen. 24px corners + diffuse shadows read
+     consumer-soft; clinical software wants precision.
+
+  Contrast is measured, not guessed: slate-400 4.6:1, slate-500 6.0:1,
+  red-950 on white 15.7:1, white on red-950 15.7:1 — all WCAG AA.
+  Do not lighten slate-400 past 56%; it is used for small labels.
+  ─────────────────────────────────────────────────────────────────────────
+*/
+@theme {
+  /* Warm neutrals, hue-biased toward the brand */
+  --color-slate-50: oklch(98.5% 0.003 30);
+  --color-slate-100: oklch(97% 0.004 30);
+  --color-slate-200: oklch(92.5% 0.006 30);
+  --color-slate-300: oklch(87% 0.008 30);
+  --color-slate-400: oklch(56% 0.012 30);
+  --color-slate-500: oklch(50% 0.014 30);
+  --color-slate-600: oklch(44% 0.014 30);
+  --color-slate-700: oklch(36% 0.013 30);
+  --color-slate-800: oklch(27% 0.012 30);
+  --color-slate-900: oklch(21% 0.012 30);
+  --color-slate-950: oklch(15% 0.012 30);
+
+  /* Brand red — red-950 is the canonical BloodBridge garnet */
+  --color-red-50: oklch(96% 0.018 12.094);
+  --color-red-100: oklch(93% 0.032 12.094);
+  --color-red-200: oklch(88% 0.055 12.094);
+  --color-red-300: oklch(80% 0.085 12.094);
+  --color-red-400: oklch(68% 0.13 12.094);
+  --color-red-500: oklch(58% 0.17 12.094);
+  --color-red-600: oklch(51% 0.18 12.094);
+  --color-red-700: oklch(45% 0.16 12.094);
+  --color-red-800: oklch(38% 0.15 12.094);
+  --color-red-900: oklch(32% 0.12 12.094);
+  --color-red-950: oklch(27.1% 0.105 12.094);
+
+  /* Precision over softness */
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
+  --radius-2xl: 0.875rem;
+  --radius-3xl: 1.125rem;
+
+  /* Crisper, tighter shadows */
+  --shadow-sm: 0 1px 2px 0 oklch(20% 0.02 30 / 0.06);
+  --shadow-md: 0 2px 6px -1px oklch(20% 0.02 30 / 0.08);
+  --shadow-lg: 0 6px 16px -4px oklch(20% 0.02 30 / 0.1);
+  --shadow-xl: 0 12px 32px -8px oklch(20% 0.02 30 / 0.14);
+
+  /*
+    Accent family. Every one of these is a relative of the brand garnet —
+    walked around the wheel from 12 toward warm ember and cool plum — so the
+    palette reads as one temperature rather than garnet plus bolted-on colour.
+  */
+  --color-garnet: oklch(27.1% 0.105 12.094);
+  --color-garnet-deep: oklch(19% 0.085 8);
+  --color-plum: oklch(31% 0.115 350);
+  --color-crimson: oklch(45% 0.19 15);
+  --color-rose: oklch(62% 0.2 18);
+  /* 63% keeps white icons on the ember→crimson tile above the 3:1 minimum for
+     non-text UI; 70% measured 2.82:1 at the ember end of that gradient. */
+  --color-ember: oklch(63% 0.16 48);
+  --color-gold: oklch(83% 0.13 82);
+
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-source-sans-3), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", monospace;
+
+  /* Motion. One curve family, three speeds — so nothing feels hand-tuned. */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --animate-rise: bb-rise 0.7s var(--ease-out-soft) both;
+  --animate-fade: bb-fade 0.6s var(--ease-out-soft) both;
+  --animate-float: bb-float 7s var(--ease-in-out-soft) infinite;
+  --animate-drift: bb-drift 18s var(--ease-in-out-soft) infinite;
+  --animate-pulse-ring: bb-pulse-ring 3.2s var(--ease-out-soft) infinite;
+  --animate-draw: bb-draw 2.4s var(--ease-in-out-soft) infinite;
+  --animate-sheen: bb-sheen 6s var(--ease-in-out-soft) infinite;
+
+  @keyframes bb-rise {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 18px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes bb-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes bb-float {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0);
+    }
+    50% {
+      transform: translate3d(0, -9px, 0);
+    }
+  }
+
+  @keyframes bb-drift {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    33% {
+      transform: translate3d(3%, -4%, 0) scale(1.08);
+    }
+    66% {
+      transform: translate3d(-3%, 3%, 0) scale(0.95);
+    }
+  }
+
+  @keyframes bb-pulse-ring {
+    0% {
+      opacity: 0.55;
+      transform: scale(0.82);
+    }
+    70% {
+      opacity: 0;
+      transform: scale(1.45);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.45);
+    }
+  }
+
+  @keyframes bb-draw {
+    0% {
+      stroke-dashoffset: 260;
+    }
+    55%,
+    100% {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  /*
+    Chart entrances. All CSS, no hooks — DashboardWidgets is shared between
+    server and client components, so the charts have to animate without any
+    JavaScript of their own.
+  */
+  --animate-draw-line: bb-draw-line 1.5s var(--ease-out-soft) both;
+  --animate-grow-bar: bb-grow-bar 0.85s var(--ease-out-soft) both;
+  --animate-sweep: bb-sweep 1.3s var(--ease-out-soft) both;
+  --animate-expand: bb-expand 0.9s var(--ease-out-soft) both;
+  --animate-beacon: bb-beacon 2.4s var(--ease-out-soft) infinite;
+
+  @keyframes bb-draw-line {
+    from {
+      stroke-dashoffset: var(--dash, 1200);
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes bb-grow-bar {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+
+  @keyframes bb-expand {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  @keyframes bb-sweep {
+    from {
+      stroke-dashoffset: var(--circumference, 340);
+    }
+    to {
+      stroke-dashoffset: var(--offset, 0);
+    }
+  }
+
+  /* The endpoint of a trend line: a slow halo that says "this is the live
+     edge of the data", distinct from the hero's faster heartbeat. */
+  @keyframes bb-beacon {
+    0% {
+      opacity: 0.35;
+      transform: scale(0.6);
+    }
+    70% {
+      opacity: 0;
+      transform: scale(2.1);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(2.1);
+    }
+  }
+
+  @keyframes bb-sheen {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: oklch(99% 0.003 30);
+  --foreground: oklch(21% 0.012 30);
 }
 
 :root {
@@ -17,4 +253,631 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-source-sans-3), ui-sans-serif, system-ui, sans-serif;
+}
+
+/*
+  Display face carries headings; body face carries prose and UI.
+
+  Fraunces is a variable serif with optical-size, SOFT and WONK axes. Dialling
+  SOFT up and WONK off keeps it warm and human — right for a donation service —
+  without the editorial quirk that would undercut a clinical tool. The optical
+  size axis is what makes a 56px headline and a 20px subhead look like the same
+  typeface rather than one scaled photographically.
+*/
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-variation-settings: "SOFT" 30, "WONK" 0;
+  letter-spacing: -0.018em;
+}
+
+h1 {
+  font-variation-settings: "SOFT" 40, "WONK" 0;
+}
+
+/* Digits line up in columns wherever they are compared. */
+.tabular-nums,
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  Scroll reveal. The hidden state is scoped to `.js`, which the inline script
+  in the landing page sets before first paint — so with JavaScript disabled or
+  still loading, every section renders visible instead of blank.
+*/
+.js [data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 22px, 0);
+  transition:
+    opacity 0.75s var(--ease-out-soft),
+    transform 0.75s var(--ease-out-soft);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.js [data-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Honour the OS setting: no entrances, no ambient loops, nothing that moves. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .js [data-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* One focus treatment for the whole product. Interactive elements that
+   don't set their own get a precise brand-tinted ring rather than the
+   browser default, which varies per engine. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid oklch(45% 0.16 12.094);
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+
+::selection {
+  background: oklch(88% 0.055 12.094);
+  color: oklch(21% 0.012 30);
+}
+
+/*
+  Theme tokens for the dashboard shell and the floating AI assistant.
+  Light-only by design. Existing pages built with literal Tailwind utility
+  classes (bg-slate-100, text-slate-950, etc.) do not read these.
+*/
+:root {
+  --bb-bg: oklch(98% 0.004 30);
+  --bb-sidebar: oklch(99.2% 0.003 30);
+  --bb-surface: oklch(100% 0 0);
+  --bb-surface-2: oklch(96% 0.006 30);
+  --bb-border: oklch(90% 0.008 30);
+  --bb-text: oklch(22% 0.015 30);
+  --bb-text-muted: oklch(50% 0.012 30);
+  /* 4.88:1 on white — WCAG AA for small text. Do not lighten past 56%. */
+  --bb-text-faint: oklch(55% 0.012 30);
+  --bb-accent: oklch(27.1% 0.105 12.094);
+  --bb-accent-strong: oklch(20% 0.1 12.094);
+  --bb-accent-soft: oklch(93% 0.035 12.094);
+  --bb-on-accent: oklch(99% 0.004 12.094);
+  --bb-success: oklch(56% 0.13 155);
+  --bb-success-soft: oklch(94% 0.05 155);
+  --bb-warning: oklch(72% 0.13 80);
+  --bb-warning-soft: oklch(95% 0.05 80);
+  --bb-high: oklch(66% 0.16 45);
+  --bb-high-soft: oklch(95% 0.06 45);
+  --bb-high-border: oklch(80% 0.1 45);
+  --bb-shadow: 0 1px 2px oklch(20% 0.02 30 / 0.07);
+  --bb-shadow-md: 0 10px 28px oklch(20% 0.02 30 / 0.16);
+  --bb-focus: oklch(55% 0.14 250);
+}
+
+/*
+  ─────────────────────────────────────────────────────────────────────────
+  Dark mode.
+
+  Every page is built from Tailwind utilities, and each of those utilities
+  resolves a CSS variable (`.bg-white { background-color: var(--color-white) }`).
+  So the whole product can be re-themed by redefining those variables under
+  `[data-theme="dark"]` — no page has to be rewritten.
+
+  The neutral ramp flips: slate-50 becomes the darkest surface and slate-950
+  the lightest text, so `bg-slate-50` is still "the quiet background" and
+  `text-slate-950` is still "the strongest text". Everything in between keeps
+  its relative role.
+
+  Two colours carry a second job and are handled by the targeted overrides at
+  the bottom: `white` is both a card surface and button-label text, and
+  `red-950` is both the filled brand button and accent text.
+
+  `data-theme` is set on <html> before paint by the inline script in
+  app/layout.tsx, so there is no flash of the wrong theme.
+  ─────────────────────────────────────────────────────────────────────────
+*/
+/*
+  The dark palette, defined once and applied by two arms below: the person
+  chose dark (the server renders data-theme from their cookie, so the attribute
+  survives hydration), or they have chosen nothing and their system asks for
+  dark. Choosing light always wins over the system.
+*/
+:root {
+  --dk--background: oklch(14% 0.008 30);
+  --dk--foreground: oklch(95% 0.004 30);
+  --dk--color-slate-50: oklch(19.5% 0.008 30);
+  --dk--color-slate-100: oklch(23% 0.009 30);
+  --dk--color-slate-200: oklch(38% 0.011 30);
+  --dk--color-slate-300: oklch(52% 0.013 30);
+  --dk--color-slate-400: oklch(67% 0.013 30);
+  --dk--color-slate-500: oklch(74% 0.012 30);
+  --dk--color-slate-600: oklch(80% 0.011 30);
+  --dk--color-slate-700: oklch(86% 0.009 30);
+  --dk--color-slate-800: oklch(91% 0.007 30);
+  --dk--color-slate-900: oklch(95% 0.005 30);
+  --dk--color-slate-950: oklch(98% 0.003 30);
+  --dk--color-red-50: oklch(26% 0.045 12.094);
+  --dk--color-red-100: oklch(30% 0.06 12.094);
+  --dk--color-red-200: oklch(37% 0.085 12.094);
+  --dk--color-red-300: oklch(46% 0.115 12.094);
+  --dk--color-red-400: oklch(62% 0.15 12.094);
+  --dk--color-red-500: oklch(68% 0.17 12.094);
+  --dk--color-red-600: oklch(64% 0.175 12.094);
+  --dk--color-red-700: oklch(58% 0.17 12.094);
+  --dk--color-red-800: oklch(50% 0.155 12.094);
+  --dk--color-red-900: oklch(44% 0.14 12.094);
+  --dk--color-red-950: oklch(40% 0.135 12.094);
+  --dk--color-emerald-50: oklch(25% 0.045 155);
+  --dk--color-emerald-100: oklch(29% 0.06 155);
+  --dk--color-emerald-200: oklch(38% 0.08 155);
+  --dk--color-emerald-600: oklch(72% 0.14 155);
+  --dk--color-emerald-700: oklch(78% 0.13 155);
+  --dk--color-emerald-800: oklch(84% 0.11 155);
+  --dk--color-emerald-900: oklch(89% 0.08 155);
+  --dk--color-amber-50: oklch(26% 0.04 80);
+  --dk--color-amber-100: oklch(30% 0.055 80);
+  --dk--color-amber-200: oklch(39% 0.07 80);
+  --dk--color-amber-700: oklch(82% 0.12 80);
+  --dk--color-amber-800: oklch(87% 0.1 80);
+  --dk--color-amber-900: oklch(91% 0.08 80);
+  --dk--color-blue-50: oklch(26% 0.04 250);
+  --dk--color-blue-600: oklch(75% 0.12 250);
+  --dk--color-blue-700: oklch(80% 0.11 250);
+  --dk--color-purple-50: oklch(26% 0.04 310);
+  --dk--color-purple-700: oklch(80% 0.11 310);
+  --dk--color-orange-50: oklch(26% 0.045 48);
+  --dk--color-orange-700: oklch(80% 0.13 48);
+  --dk--shadow-sm: 0 1px 2px 0 oklch(0% 0 0 / 0.5);
+  --dk--shadow-md: 0 2px 6px -1px oklch(0% 0 0 / 0.55);
+  --dk--shadow-lg: 0 6px 16px -4px oklch(0% 0 0 / 0.6);
+  --dk--shadow-xl: 0 12px 32px -8px oklch(0% 0 0 / 0.65);
+  --dk--bb-bg: oklch(14% 0.008 30);
+  --dk--bb-sidebar: oklch(18% 0.009 30);
+  --dk--bb-surface: oklch(22% 0.009 30);
+  --dk--bb-surface-2: oklch(27% 0.01 30);
+  --dk--bb-border: oklch(45% 0.013 30);
+  --dk--bb-text: oklch(95% 0.004 30);
+  --dk--bb-text-muted: oklch(78% 0.011 30);
+  --dk--bb-text-faint: oklch(72% 0.012 30);
+  --dk--bb-accent: oklch(45% 0.15 12.094);
+  --dk--bb-accent-strong: oklch(55% 0.17 12.094);
+  --dk--bb-accent-soft: oklch(30% 0.06 12.094);
+  --dk--bb-on-accent: oklch(99% 0.004 12.094);
+  --dk--bb-success: oklch(72% 0.14 155);
+  --dk--bb-success-soft: oklch(28% 0.055 155);
+  --dk--bb-warning: oklch(80% 0.12 80);
+  --dk--bb-warning-soft: oklch(29% 0.05 80);
+  --dk--bb-high: oklch(74% 0.14 45);
+  --dk--bb-high-soft: oklch(29% 0.055 45);
+  --dk--bb-high-border: oklch(42% 0.09 45);
+  --dk--bb-shadow: 0 1px 2px oklch(0% 0 0 / 0.5);
+  --dk--bb-shadow-md: 0 10px 28px oklch(0% 0 0 / 0.6);
+  --dk--bb-focus: oklch(70% 0.13 250);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --background: var(--dk--background);
+  --foreground: var(--dk--foreground);
+  --color-slate-50: var(--dk--color-slate-50);
+  --color-slate-100: var(--dk--color-slate-100);
+  --color-slate-200: var(--dk--color-slate-200);
+  --color-slate-300: var(--dk--color-slate-300);
+  --color-slate-400: var(--dk--color-slate-400);
+  --color-slate-500: var(--dk--color-slate-500);
+  --color-slate-600: var(--dk--color-slate-600);
+  --color-slate-700: var(--dk--color-slate-700);
+  --color-slate-800: var(--dk--color-slate-800);
+  --color-slate-900: var(--dk--color-slate-900);
+  --color-slate-950: var(--dk--color-slate-950);
+  --color-red-50: var(--dk--color-red-50);
+  --color-red-100: var(--dk--color-red-100);
+  --color-red-200: var(--dk--color-red-200);
+  --color-red-300: var(--dk--color-red-300);
+  --color-red-400: var(--dk--color-red-400);
+  --color-red-500: var(--dk--color-red-500);
+  --color-red-600: var(--dk--color-red-600);
+  --color-red-700: var(--dk--color-red-700);
+  --color-red-800: var(--dk--color-red-800);
+  --color-red-900: var(--dk--color-red-900);
+  --color-red-950: var(--dk--color-red-950);
+  --color-emerald-50: var(--dk--color-emerald-50);
+  --color-emerald-100: var(--dk--color-emerald-100);
+  --color-emerald-200: var(--dk--color-emerald-200);
+  --color-emerald-600: var(--dk--color-emerald-600);
+  --color-emerald-700: var(--dk--color-emerald-700);
+  --color-emerald-800: var(--dk--color-emerald-800);
+  --color-emerald-900: var(--dk--color-emerald-900);
+  --color-amber-50: var(--dk--color-amber-50);
+  --color-amber-100: var(--dk--color-amber-100);
+  --color-amber-200: var(--dk--color-amber-200);
+  --color-amber-700: var(--dk--color-amber-700);
+  --color-amber-800: var(--dk--color-amber-800);
+  --color-amber-900: var(--dk--color-amber-900);
+  --color-blue-50: var(--dk--color-blue-50);
+  --color-blue-600: var(--dk--color-blue-600);
+  --color-blue-700: var(--dk--color-blue-700);
+  --color-purple-50: var(--dk--color-purple-50);
+  --color-purple-700: var(--dk--color-purple-700);
+  --color-orange-50: var(--dk--color-orange-50);
+  --color-orange-700: var(--dk--color-orange-700);
+  --shadow-sm: var(--dk--shadow-sm);
+  --shadow-md: var(--dk--shadow-md);
+  --shadow-lg: var(--dk--shadow-lg);
+  --shadow-xl: var(--dk--shadow-xl);
+  --bb-bg: var(--dk--bb-bg);
+  --bb-sidebar: var(--dk--bb-sidebar);
+  --bb-surface: var(--dk--bb-surface);
+  --bb-surface-2: var(--dk--bb-surface-2);
+  --bb-border: var(--dk--bb-border);
+  --bb-text: var(--dk--bb-text);
+  --bb-text-muted: var(--dk--bb-text-muted);
+  --bb-text-faint: var(--dk--bb-text-faint);
+  --bb-accent: var(--dk--bb-accent);
+  --bb-accent-strong: var(--dk--bb-accent-strong);
+  --bb-accent-soft: var(--dk--bb-accent-soft);
+  --bb-on-accent: var(--dk--bb-on-accent);
+  --bb-success: var(--dk--bb-success);
+  --bb-success-soft: var(--dk--bb-success-soft);
+  --bb-warning: var(--dk--bb-warning);
+  --bb-warning-soft: var(--dk--bb-warning-soft);
+  --bb-high: var(--dk--bb-high);
+  --bb-high-soft: var(--dk--bb-high-soft);
+  --bb-high-border: var(--dk--bb-high-border);
+  --bb-shadow: var(--dk--bb-shadow);
+  --bb-shadow-md: var(--dk--bb-shadow-md);
+  --bb-focus: var(--dk--bb-focus);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  color-scheme: dark;
+  --background: var(--dk--background);
+  --foreground: var(--dk--foreground);
+  --color-slate-50: var(--dk--color-slate-50);
+  --color-slate-100: var(--dk--color-slate-100);
+  --color-slate-200: var(--dk--color-slate-200);
+  --color-slate-300: var(--dk--color-slate-300);
+  --color-slate-400: var(--dk--color-slate-400);
+  --color-slate-500: var(--dk--color-slate-500);
+  --color-slate-600: var(--dk--color-slate-600);
+  --color-slate-700: var(--dk--color-slate-700);
+  --color-slate-800: var(--dk--color-slate-800);
+  --color-slate-900: var(--dk--color-slate-900);
+  --color-slate-950: var(--dk--color-slate-950);
+  --color-red-50: var(--dk--color-red-50);
+  --color-red-100: var(--dk--color-red-100);
+  --color-red-200: var(--dk--color-red-200);
+  --color-red-300: var(--dk--color-red-300);
+  --color-red-400: var(--dk--color-red-400);
+  --color-red-500: var(--dk--color-red-500);
+  --color-red-600: var(--dk--color-red-600);
+  --color-red-700: var(--dk--color-red-700);
+  --color-red-800: var(--dk--color-red-800);
+  --color-red-900: var(--dk--color-red-900);
+  --color-red-950: var(--dk--color-red-950);
+  --color-emerald-50: var(--dk--color-emerald-50);
+  --color-emerald-100: var(--dk--color-emerald-100);
+  --color-emerald-200: var(--dk--color-emerald-200);
+  --color-emerald-600: var(--dk--color-emerald-600);
+  --color-emerald-700: var(--dk--color-emerald-700);
+  --color-emerald-800: var(--dk--color-emerald-800);
+  --color-emerald-900: var(--dk--color-emerald-900);
+  --color-amber-50: var(--dk--color-amber-50);
+  --color-amber-100: var(--dk--color-amber-100);
+  --color-amber-200: var(--dk--color-amber-200);
+  --color-amber-700: var(--dk--color-amber-700);
+  --color-amber-800: var(--dk--color-amber-800);
+  --color-amber-900: var(--dk--color-amber-900);
+  --color-blue-50: var(--dk--color-blue-50);
+  --color-blue-600: var(--dk--color-blue-600);
+  --color-blue-700: var(--dk--color-blue-700);
+  --color-purple-50: var(--dk--color-purple-50);
+  --color-purple-700: var(--dk--color-purple-700);
+  --color-orange-50: var(--dk--color-orange-50);
+  --color-orange-700: var(--dk--color-orange-700);
+  --shadow-sm: var(--dk--shadow-sm);
+  --shadow-md: var(--dk--shadow-md);
+  --shadow-lg: var(--dk--shadow-lg);
+  --shadow-xl: var(--dk--shadow-xl);
+  --bb-bg: var(--dk--bb-bg);
+  --bb-sidebar: var(--dk--bb-sidebar);
+  --bb-surface: var(--dk--bb-surface);
+  --bb-surface-2: var(--dk--bb-surface-2);
+  --bb-border: var(--dk--bb-border);
+  --bb-text: var(--dk--bb-text);
+  --bb-text-muted: var(--dk--bb-text-muted);
+  --bb-text-faint: var(--dk--bb-text-faint);
+  --bb-accent: var(--dk--bb-accent);
+  --bb-accent-strong: var(--dk--bb-accent-strong);
+  --bb-accent-soft: var(--dk--bb-accent-soft);
+  --bb-on-accent: var(--dk--bb-on-accent);
+  --bb-success: var(--dk--bb-success);
+  --bb-success-soft: var(--dk--bb-success-soft);
+  --bb-warning: var(--dk--bb-warning);
+  --bb-warning-soft: var(--dk--bb-warning-soft);
+  --bb-high: var(--dk--bb-high);
+  --bb-high-soft: var(--dk--bb-high-soft);
+  --bb-high-border: var(--dk--bb-high-border);
+  --bb-shadow: var(--dk--bb-shadow);
+  --bb-shadow-md: var(--dk--bb-shadow-md);
+  --bb-focus: var(--dk--bb-focus);
+  }
+}
+
+[data-theme="dark"] ::selection {
+  background: oklch(40% 0.11 12.094);
+  color: oklch(98% 0.003 30);
+}
+
+/*
+  Targeted overrides for the two dual-role colours.
+
+  `white` stays #fff so `text-white` keeps working on filled buttons; only its
+  surface uses are re-pointed. `red-950` stays the filled-button colour above;
+  here its text uses are lifted to a legible rose.
+*/
+[data-theme="dark"] .bg-white {
+  background-color: var(--bb-surface);
+}
+
+[data-theme="dark"] .bg-white\/95 {
+  background-color: color-mix(in oklab, var(--bb-surface) 95%, transparent);
+}
+
+[data-theme="dark"] .bg-white\/60 {
+  background-color: color-mix(in oklab, var(--bb-surface) 60%, transparent);
+}
+
+[data-theme="dark"] .bg-white\/50 {
+  background-color: color-mix(in oklab, var(--bb-surface) 50%, transparent);
+}
+
+[data-theme="dark"] .text-red-950,
+[data-theme="dark"] .text-red-900,
+[data-theme="dark"] .text-red-800,
+[data-theme="dark"] .text-red-700,
+[data-theme="dark"] .text-garnet {
+  color: oklch(82% 0.12 12.094);
+}
+
+/* Inputs: the browser's own light defaults would otherwise show through. */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: var(--bb-surface-2);
+  color: var(--bb-text);
+  /* 3:1 against the field, so the control's boundary is perceivable (WCAG 1.4.11). */
+  border-color: oklch(57% 0.013 30);
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--bb-text-faint);
+}
+
+/* The date/time pickers' own glyphs are drawn black by the browser. */
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/*
+  Gradient *text* uses the brand accents, which are dark by design because
+  they are mostly used as fills behind white labels. On a dark ground the
+  same gradient would be unreadable, so the text-clipped case is lifted.
+*/
+[data-theme="dark"] .bg-clip-text.bg-gradient-to-br {
+  background-image: linear-gradient(
+    to bottom right,
+    oklch(80% 0.15 15) 0%,
+    oklch(72% 0.14 12.094) 55%,
+    oklch(70% 0.13 350) 100%
+  );
+}
+
+/*
+  Messaging surface. The thread canvas sits a shade behind the message
+  bubbles in both themes, so a bubble reads as an object on a surface rather
+  than a box drawn on the same plane.
+*/
+:root {
+  --bb-chat-canvas: oklch(96.5% 0.005 30);
+}
+
+[data-theme="dark"] {
+  --bb-chat-canvas: oklch(15% 0.008 30);
+}
+
+.bbChatCanvas {
+  background-color: var(--bb-chat-canvas);
+}
+
+/* Scrollbars are part of the design; the browser default belongs to no one. */
+.bbScroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bb-border) transparent;
+}
+
+.bbScroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.bbScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.bbScroll::-webkit-scrollbar-thumb {
+  background: var(--bb-border);
+  background-clip: content-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+
+.bbScroll::-webkit-scrollbar-thumb:hover {
+  background: var(--bb-text-faint);
+  background-clip: content-box;
+}
+
+/* The same dark-mode corrections for visitors who chose nothing and whose system asks for dark. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  
+    color-scheme: dark;
+    --background: var(--dk--background);
+    --foreground: var(--dk--foreground);
+    --color-slate-50: var(--dk--color-slate-50);
+    --color-slate-100: var(--dk--color-slate-100);
+    --color-slate-200: var(--dk--color-slate-200);
+    --color-slate-300: var(--dk--color-slate-300);
+    --color-slate-400: var(--dk--color-slate-400);
+    --color-slate-500: var(--dk--color-slate-500);
+    --color-slate-600: var(--dk--color-slate-600);
+    --color-slate-700: var(--dk--color-slate-700);
+    --color-slate-800: var(--dk--color-slate-800);
+    --color-slate-900: var(--dk--color-slate-900);
+    --color-slate-950: var(--dk--color-slate-950);
+    --color-red-50: var(--dk--color-red-50);
+    --color-red-100: var(--dk--color-red-100);
+    --color-red-200: var(--dk--color-red-200);
+    --color-red-300: var(--dk--color-red-300);
+    --color-red-400: var(--dk--color-red-400);
+    --color-red-500: var(--dk--color-red-500);
+    --color-red-600: var(--dk--color-red-600);
+    --color-red-700: var(--dk--color-red-700);
+    --color-red-800: var(--dk--color-red-800);
+    --color-red-900: var(--dk--color-red-900);
+    --color-red-950: var(--dk--color-red-950);
+    --color-emerald-50: var(--dk--color-emerald-50);
+    --color-emerald-100: var(--dk--color-emerald-100);
+    --color-emerald-200: var(--dk--color-emerald-200);
+    --color-emerald-600: var(--dk--color-emerald-600);
+    --color-emerald-700: var(--dk--color-emerald-700);
+    --color-emerald-800: var(--dk--color-emerald-800);
+    --color-emerald-900: var(--dk--color-emerald-900);
+    --color-amber-50: var(--dk--color-amber-50);
+    --color-amber-100: var(--dk--color-amber-100);
+    --color-amber-200: var(--dk--color-amber-200);
+    --color-amber-700: var(--dk--color-amber-700);
+    --color-amber-800: var(--dk--color-amber-800);
+    --color-amber-900: var(--dk--color-amber-900);
+    --color-blue-50: var(--dk--color-blue-50);
+    --color-blue-600: var(--dk--color-blue-600);
+    --color-blue-700: var(--dk--color-blue-700);
+    --color-purple-50: var(--dk--color-purple-50);
+    --color-purple-700: var(--dk--color-purple-700);
+    --color-orange-50: var(--dk--color-orange-50);
+    --color-orange-700: var(--dk--color-orange-700);
+    --shadow-sm: var(--dk--shadow-sm);
+    --shadow-md: var(--dk--shadow-md);
+    --shadow-lg: var(--dk--shadow-lg);
+    --shadow-xl: var(--dk--shadow-xl);
+    --bb-bg: var(--dk--bb-bg);
+    --bb-sidebar: var(--dk--bb-sidebar);
+    --bb-surface: var(--dk--bb-surface);
+    --bb-surface-2: var(--dk--bb-surface-2);
+    --bb-border: var(--dk--bb-border);
+    --bb-text: var(--dk--bb-text);
+    --bb-text-muted: var(--dk--bb-text-muted);
+    --bb-text-faint: var(--dk--bb-text-faint);
+    --bb-accent: var(--dk--bb-accent);
+    --bb-accent-strong: var(--dk--bb-accent-strong);
+    --bb-accent-soft: var(--dk--bb-accent-soft);
+    --bb-on-accent: var(--dk--bb-on-accent);
+    --bb-success: var(--dk--bb-success);
+    --bb-success-soft: var(--dk--bb-success-soft);
+    --bb-warning: var(--dk--bb-warning);
+    --bb-warning-soft: var(--dk--bb-warning-soft);
+    --bb-high: var(--dk--bb-high);
+    --bb-high-soft: var(--dk--bb-high-soft);
+    --bb-high-border: var(--dk--bb-high-border);
+    --bb-shadow: var(--dk--bb-shadow);
+    --bb-shadow-md: var(--dk--bb-shadow-md);
+    --bb-focus: var(--dk--bb-focus);
+  }
+
+  :root:not([data-theme="light"]) ::selection {
+  
+    background: oklch(40% 0.11 12.094);
+    color: oklch(98% 0.003 30);
+  }
+
+  :root:not([data-theme="light"]) .bg-white {
+  
+    background-color: var(--bb-surface);
+  }
+
+  :root:not([data-theme="light"]) .bg-white\/95 {
+  
+    background-color: color-mix(in oklab, var(--bb-surface) 95%, transparent);
+  }
+
+  :root:not([data-theme="light"]) .bg-white\/60 {
+  
+    background-color: color-mix(in oklab, var(--bb-surface) 60%, transparent);
+  }
+
+  :root:not([data-theme="light"]) .bg-white\/50 {
+  
+    background-color: color-mix(in oklab, var(--bb-surface) 50%, transparent);
+  }
+
+  :root:not([data-theme="light"]) .text-red-950,
+:root:not([data-theme="light"]) .text-red-900,
+:root:not([data-theme="light"]) .text-red-800,
+:root:not([data-theme="light"]) .text-red-700,
+:root:not([data-theme="light"]) .text-garnet {
+  
+    color: oklch(82% 0.12 12.094);
+  }
+
+  :root:not([data-theme="light"]) input,
+:root:not([data-theme="light"]) select,
+:root:not([data-theme="light"]) textarea {
+  
+    background-color: var(--bb-surface-2);
+    color: var(--bb-text);
+    /* 3:1 against the field, so the control's boundary is perceivable (WCAG 1.4.11). */
+    border-color: oklch(57% 0.013 30);
+  }
+
+  :root:not([data-theme="light"]) input::placeholder,
+:root:not([data-theme="light"]) textarea::placeholder {
+  
+    color: var(--bb-text-faint);
+  }
+
+  :root:not([data-theme="light"]) input[type="date"]::-webkit-calendar-picker-indicator,
+:root:not([data-theme="light"]) input[type="time"]::-webkit-calendar-picker-indicator {
+  
+    filter: invert(1);
+  }
+
+  :root:not([data-theme="light"]) .bg-clip-text.bg-gradient-to-br {
+  
+    background-image: linear-gradient(
+      to bottom right,
+      oklch(80% 0.15 15) 0%,
+      oklch(72% 0.14 12.094) 55%,
+      oklch(70% 0.13 350) 100%
+    );
+  }
+
+  :root:not([data-theme="light"]) {
+  
+    --bb-chat-canvas: oklch(15% 0.008 30);
+  }
 }

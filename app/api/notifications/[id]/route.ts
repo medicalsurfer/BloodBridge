@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { getAuthenticatedUser } from "@/src/lib/auth";
+import { id as isValidId } from "@/src/lib/input";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -17,7 +18,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { id } = await context.params;
+    const { id: rawId } = await context.params;
+    const id = isValidId(rawId);
+
+    if (!id) {
+      return NextResponse.json({ error: "Invalid identifier." }, { status: 400 });
+    }
 
     const notification = await prisma.notification.findFirst({
       where: { id, userId: authentication.user.id },

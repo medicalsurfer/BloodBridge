@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, ShieldAlert } from "lucide-react";
+import { AUDIT_ACTIONS } from "@/src/lib/audit-actions";
 
 type LogItem = {
   id: string;
@@ -13,27 +14,7 @@ type LogItem = {
   actor: { firstName: string; lastName: string; email: string; role: string } | null;
 };
 
-const actionOptions = [
-  "",
-  "USER_REGISTERED",
-  "USER_LOGGED_IN",
-  "USER_CREATED",
-  "USER_UPDATED",
-  "USER_DELETED",
-  "INSTITUTE_CREATED",
-  "INSTITUTE_UPDATED",
-  "INSTITUTE_STATUS_CHANGED",
-  "INSTITUTE_DELETED",
-  "STAFF_INVITED",
-  "STAFF_REMOVED",
-  "APPOINTMENT_BOOKED",
-  "APPOINTMENT_CANCELLED",
-  "APPOINTMENT_RESCHEDULED",
-  "DONATION_RECORDED",
-  "BLOOD_REQUEST_CREATED",
-  "REWARD_VALIDATED",
-  "REWARD_REJECTED",
-];
+const actionOptions = AUDIT_ACTIONS;
 
 function formatAction(action: string) {
   return action
@@ -58,23 +39,32 @@ export default function SystemLogsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const load = () => {
-    setLoading(true);
-    const query = action ? `?action=${action}` : "";
+  const fetchLogs = useCallback((selectedAction: string) => {
+    const query = selectedAction ? `?action=${selectedAction}` : "";
     fetch(`/api/system-admin/logs${query}`, { credentials: "include", cache: "no-store" })
       .then((response) => response.json().then((data) => ({ response, data })))
       .then(({ response, data }) => {
         if (!response.ok) throw new Error(data.error ?? "Unable to load system logs.");
+        setError("");
         setLogs(data.logs ?? []);
       })
       .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Unable to load system logs."))
       .finally(() => setLoading(false));
+  }, []);
+
+  const load = () => {
+    setLoading(true);
+    fetchLogs(action);
   };
 
+  function changeAction(next: string) {
+    setAction(next);
+    setLoading(true);
+  }
+
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [action]);
+    fetchLogs(action);
+  }, [action, fetchLogs]);
 
   return (
         <div>
@@ -89,13 +79,11 @@ export default function SystemLogsPage() {
             <div className="flex flex-wrap items-center gap-2">
               <select
                 value={action}
-                onChange={(event) => setAction(event.target.value)}
+                onChange={(event) => changeAction(event.target.value)}
                 className="h-10 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-700"
               >
                 <option value="">All actions</option>
-                {actionOptions
-                  .filter((option) => option)
-                  .map((option) => (
+                {actionOptions.map((option) => (
                     <option key={option} value={option}>
                       {formatAction(option)}
                     </option>

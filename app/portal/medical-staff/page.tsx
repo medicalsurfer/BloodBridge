@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Activity,
-  AlertOctagon,
+  CalendarCheck,
   Droplet,
+  FilePlus2,
   LayoutDashboard,
   MessageCircle,
   RefreshCw,
@@ -13,7 +13,6 @@ import {
   Users,
 } from "lucide-react";
 import {
-  KpiCard,
   TrendAreaChart,
   WeekdayBarChart,
   RadialGauge,
@@ -22,8 +21,80 @@ import {
   bucketByDay,
   weekdayCounts,
 } from "@/src/components/dashboard/DashboardWidgets";
+import { PortalShell, type PortalNavGroup } from "@/src/components/dashboard/PortalShell";
+import { APPOINTMENT_TIMES } from "@/src/lib/appointment-slots";
+import {
+  PageHeader,
+  StatGrid,
+  Stat,
+  Panel,
+  Row,
+  RowTitle,
+  RowMeta,
+  Pill,
+  EmptyState,
+  type PillTone,
+} from "@/src/components/ui/Page";
+import { getConsultationProgress } from "@/src/lib/consultation";
 
 const PRIMARY_RED = "oklch(27.1% 0.105 12.094)";
+
+// Shared control classes, so every field and row action in this workspace is
+// the same height and weight rather than drifting per section.
+const fieldClass =
+  "h-11 w-full rounded-xl border border-slate-300 px-3.5 text-[13.5px] transition focus:border-slate-500 focus:outline-none";
+
+const rowButtonClass =
+  "inline-flex h-9 items-center rounded-lg border px-3 text-xs font-semibold transition disabled:opacity-50";
+
+const SECTIONS = ["dashboard", "requests", "appointments", "donors"] as const;
+
+type Section = (typeof SECTIONS)[number];
+
+const SECTION_COPY: Record<Section, { eyebrow: string; title: string; description: string }> = {
+  dashboard: {
+    eyebrow: "Clinical dashboard",
+    title: "Donation care workspace",
+    description: "Activity across your institute's blood requests, appointments and donor pool.",
+  },
+  requests: {
+    eyebrow: "Blood requests",
+    title: "Create and track blood requests",
+    description: "Raise a need for your institute, and follow every request you have opened.",
+  },
+  appointments: {
+    eyebrow: "Appointments",
+    title: "Donor appointments",
+    description: "Confirm attendance or cancel visits booked at your institute.",
+  },
+  donors: {
+    eyebrow: "Donor pool",
+    title: "Donor directory",
+    description: "Search donors, and filter by who can give to a patient of a given blood group.",
+  },
+};
+
+const MEDICAL_STAFF_NAV: PortalNavGroup[] = [
+  {
+    label: "Workspace",
+    links: [
+      { href: "#dashboard", label: "Dashboard", icon: <LayoutDashboard size={16} /> },
+      { href: "#requests", label: "Create blood request", icon: <FilePlus2 size={16} /> },
+      { href: "#appointments", label: "Appointments", icon: <CalendarCheck size={16} /> },
+      { href: "#donors", label: "Donor list", icon: <Users size={16} /> },
+    ],
+  },
+  {
+    label: "Support",
+    links: [
+      {
+        href: "/portal/chat",
+        label: "Donor chat",
+        icon: <MessageCircle size={16} />,
+      },
+    ],
+  },
+];
 
 type BloodGroup =
   | "A_POSITIVE"
@@ -37,7 +108,7 @@ type BloodGroup =
 
 type Urgency = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 type RequestStatus = "OPEN" | "FULFILLED" | "CANCELLED";
-type AppointmentStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
+type AppointmentStatus = "SCHEDULED" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
 
 type BloodRequestItem = {
   id: string;
@@ -70,6 +141,7 @@ type DonorItem = {
   lastName: string;
   email: string;
   phoneNumber: string | null;
+  donationsCount: number;
   donorProfile: {
     bloodGroup: BloodGroup | null;
     city: string | null;
@@ -89,11 +161,11 @@ const bloodGroupLabels: Record<BloodGroup, string> = {
   O_NEGATIVE: "O-",
 };
 
-const urgencyStyles: Record<Urgency, string> = {
-  LOW: "bg-slate-100 text-slate-700",
-  MEDIUM: "bg-amber-50 text-amber-700",
-  HIGH: "bg-orange-50 text-orange-700",
-  CRITICAL: "bg-red-50 text-red-700",
+const urgencyTones: Record<Urgency, PillTone> = {
+  LOW: "neutral",
+  MEDIUM: "warn",
+  HIGH: "warn",
+  CRITICAL: "critical",
 };
 
 const urgencyColors: Record<Urgency, string> = {
@@ -112,14 +184,43 @@ function formatDate(value: string) {
 }
 
 export default function MedicalStaffPortalPage() {
+  const router = useRouter();
   const [requests, setRequests] = useState<BloodRequestItem[]>([]);
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [donors, setDonors] = useState<DonorItem[]>([]);
   const [donorSearch, setDonorSearch] = useState("");
+  const [donorCompatibleWith, setDonorCompatibleWith] = useState<BloodGroup | "">("");
+  const [donorEligibleOnly, setDonorEligibleOnly] = useState(false);
+  const [donorsLoaded, setDonorsLoaded] = useState(false);
+  const [section, setSection] = useState<Section>("dashboard");
+
+  // Each nav entry shows its own screen, so the workspace never stacks the
+  // dashboard, the request form, appointments and donors on one page.
+  function goToSection(next: Section) {
+    setSection(next);
+    window.history.replaceState(null, "", `#${next}`);
+    document.querySelector("[data-portal-content]")?.scrollTo({ top: 0 });
+  }
+
+  useEffect(() => {
+    function applyHash() {
+      const hash = window.location.hash.replace("#", "");
+      setSection(SECTIONS.includes(hash as Section) ? (hash as Section) : "dashboard");
+    }
+
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [actionId, setActionId] = useState<string | null>(null);
+  const [contactingId, setContactingId] = useState<string | null>(null);
+  const [rescheduling, setRescheduling] = useState<AppointmentItem | null>(null);
+  const [newDate, setNewDate] = useState("");
+  const [newTime, setNewTime] = useState("");
+  const [rescheduleError, setRescheduleError] = useState("");
 
   const [requestForm, setRequestForm] = useState({
     bloodGroup: "O_POSITIVE" as BloodGroup,
@@ -138,7 +239,10 @@ export default function MedicalStaffPortalPage() {
     [openRequests],
   );
   const scheduledAppointments = useMemo(
-    () => appointments.filter((appointment) => appointment.status === "SCHEDULED"),
+    () =>
+      appointments.filter(
+        (appointment) => appointment.status === "SCHEDULED" || appointment.status === "CONFIRMED",
+      ),
     [appointments],
   );
 
@@ -170,45 +274,49 @@ export default function MedicalStaffPortalPage() {
   const fulfillmentRate =
     requests.length === 0 ? 0 : Math.round((fulfilledCount / requests.length) * 100);
 
-  async function loadAll() {
-    setLoading(true);
-    setError("");
-
+  // Donors are loaded by the directory effect below, which reacts to its filters.
+  const loadAll = useCallback(async () => {
     try {
-      const [requestsRes, appointmentsRes, donorsRes] = await Promise.all([
+      const [requestsRes, appointmentsRes] = await Promise.all([
         fetch("/api/medical-staff/blood-requests", { credentials: "include", cache: "no-store" }),
         fetch("/api/medical-staff/appointments", { credentials: "include", cache: "no-store" }),
-        fetch("/api/medical-staff/donors", { credentials: "include", cache: "no-store" }),
       ]);
 
-      const [requestsData, appointmentsData, donorsData] = await Promise.all([
+      const [requestsData, appointmentsData] = await Promise.all([
         requestsRes.json().catch(() => ({})),
         appointmentsRes.json().catch(() => ({})),
-        donorsRes.json().catch(() => ({})),
       ]);
 
       if (!requestsRes.ok) throw new Error(requestsData.error ?? "Unable to load blood requests.");
       if (!appointmentsRes.ok) throw new Error(appointmentsData.error ?? "Unable to load appointments.");
-      if (!donorsRes.ok) throw new Error(donorsData.error ?? "Unable to load donors.");
 
+      setError("");
       setRequests(requestsData.requests ?? []);
       setAppointments(appointmentsData.appointments ?? []);
-      setDonors(donorsData.donors ?? []);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load your workspace.");
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  function refresh() {
+    setLoading(true);
+    void loadAll();
   }
 
   useEffect(() => {
-    void loadAll();
-  }, []);
+    // Initial load; state updates happen after the fetches resolve.
+    const initial = setTimeout(() => void loadAll(), 0);
+    return () => clearTimeout(initial);
+  }, [loadAll]);
 
   useEffect(() => {
     const timeout = setTimeout(async () => {
       const params = new URLSearchParams();
       if (donorSearch.trim()) params.set("search", donorSearch.trim());
+      if (donorCompatibleWith) params.set("compatibleWith", donorCompatibleWith);
+      if (donorEligibleOnly) params.set("eligibleOnly", "1");
 
       const response = await fetch(`/api/medical-staff/donors?${params.toString()}`, {
         credentials: "include",
@@ -216,10 +324,11 @@ export default function MedicalStaffPortalPage() {
       });
       const data = await response.json().catch(() => ({}));
       if (response.ok) setDonors(data.donors ?? []);
+      setDonorsLoaded(true);
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [donorSearch]);
+  }, [donorSearch, donorCompatibleWith, donorEligibleOnly]);
 
   async function submitRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -281,7 +390,35 @@ export default function MedicalStaffPortalPage() {
     }
   }
 
-  async function updateAppointmentStatus(id: string, status: "COMPLETED" | "CANCELLED") {
+  async function contactDonor(donorId: string) {
+    setContactingId(donorId);
+    setError("");
+
+    try {
+      const response = await fetch("/api/conversations", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ donorId }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Unable to start a conversation.");
+      }
+
+      router.push(`/portal/chat?conversationId=${data.conversation.id}`);
+    } catch (contactError) {
+      setError(contactError instanceof Error ? contactError.message : "Unable to start a conversation.");
+      setContactingId(null);
+    }
+  }
+
+  async function changeAppointment(
+    id: string,
+    change: { status?: "CONFIRMED" | "COMPLETED" | "CANCELLED"; appointmentDate?: string; appointmentTime?: string },
+    successMessage: string,
+  ) {
     setActionId(id);
     setError("");
     setNotice("");
@@ -291,7 +428,7 @@ export default function MedicalStaffPortalPage() {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status }),
+        body: JSON.stringify({ id, ...change }),
       });
       const data = await response.json().catch(() => ({}));
 
@@ -300,94 +437,93 @@ export default function MedicalStaffPortalPage() {
       }
 
       setAppointments((current) => current.map((item) => (item.id === id ? data.appointment : item)));
+      setNotice(successMessage);
+      return true;
     } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : "Unable to update appointment.");
+      const message = updateError instanceof Error ? updateError.message : "Unable to update appointment.";
+      if (rescheduling?.id === id) setRescheduleError(message);
+      else setError(message);
+      return false;
     } finally {
       setActionId(null);
     }
   }
 
+  function openReschedule(appointment: AppointmentItem) {
+    setRescheduling(appointment);
+    setNewDate(appointment.appointmentDate.slice(0, 10));
+    setNewTime(appointment.appointmentTime);
+    setRescheduleError("");
+  }
+
+  async function submitReschedule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!rescheduling) return;
+
+    setRescheduleError("");
+
+    const moved = await changeAppointment(
+      rescheduling.id,
+      { appointmentDate: newDate, appointmentTime: newTime },
+      `Appointment moved to ${newDate} at ${newTime}. The donor has been notified.`,
+    );
+
+    if (moved) setRescheduling(null);
+  }
+
   return (
-    <main className="min-h-screen bg-slate-100 p-4">
-      <section className="mx-auto max-w-375 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <PortalShell
+      brandHref="/portal/medical-staff"
+      title="Clinical dashboard"
+      subtitle="Blood requests, appointments and the donor pool"
+      navGroups={MEDICAL_STAFF_NAV}
+      activeHref={`#${section}`}
+      onNavigate={(href) => goToSection(href.replace("#", "") as Section)}
+      accountName="Medical staff"
+      accountRole="Donation care"
+    >
+          <div className="mx-auto max-w-7xl">
 
-        <header className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div style={{ backgroundColor: PRIMARY_RED }} className="flex h-10 w-10 items-center justify-center rounded-xl text-white">
-              <Activity size={19} />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-slate-950">BloodBridge</p>
-              <p className="text-[10px] text-slate-400">Clinical care workspace</p>
-            </div>
-          </div>
+            <PageHeader
+              eyebrow={SECTION_COPY[section].eyebrow}
+              title={SECTION_COPY[section].title}
+              description={SECTION_COPY[section].description}
+              actions={
+                <button
+                  onClick={refresh}
+                  className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-300 px-5 text-[13px] font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                >
+                  <RefreshCw size={15} />
+                  Refresh
+                </button>
+              }
+            />
 
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="text-xs font-bold text-slate-800">Medical staff</p>
-              <p className="mt-0.5 text-[10px] text-slate-400">Donation care</p>
-            </div>
-            <div style={{ backgroundColor: PRIMARY_RED }} className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white">
-              MS
-            </div>
-          </div>
-        </header>
+            {error && <p className="mt-6 rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</p>}
+            {notice && <p className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</p>}
 
-        <div className="grid min-h-175 lg:grid-cols-[230px_1fr]">
-
-          <aside className="border-r border-slate-200 bg-white p-4">
-            <nav className="space-y-2">
-              <NavItem href="#dashboard" label="Dashboard" icon={<LayoutDashboard size={18} />} active />
-              <NavItem href="#requests" label="Blood requests" icon={<Droplet size={18} />} />
-              <NavItem href="#donors" label="Donor directory" icon={<Users size={18} />} />
-              <NavItem href="/portal/institute-admin/chat" label="Donor chat" icon={<MessageCircle size={18} />} />
-            </nav>
-
-            <div className="mt-8 border-t border-slate-100 pt-5">
-              <p className="px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Account</p>
-              <div className="mt-3 space-y-2">
-                <Link href="/api/logout" className="flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-red-700 transition hover:bg-red-50">
-                  <LogoutIcon />
-                  Sign out
-                </Link>
-              </div>
-            </div>
-          </aside>
-
-          <section id="dashboard" className="bg-slate-50/70 p-6 lg:p-8">
-
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-red-950">
-                  <Activity size={13} strokeWidth={2.5} />
-                  Clinical dashboard
-                </p>
-                <h1 className="mt-2 text-3xl font-bold text-slate-950">Donation care workspace</h1>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                  Raise blood requests, keep appointments moving, and know your donor pool.
-                </p>
-              </div>
-
-              <button onClick={loadAll} className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
-                <RefreshCw size={15} />
-                Refresh
-              </button>
-            </div>
-
-            {error && <p className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
-            {notice && <p className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700">{notice}</p>}
-
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <KpiCard label="Open blood requests" value={openRequests.length.toString()} delta="Visible to donors" trend="flat" icon={<Droplet size={18} />} />
-              <KpiCard label="Scheduled appointments" value={scheduledAppointments.length.toString()} delta="Upcoming visits" trend="flat" icon={<Activity size={18} />} />
-              <KpiCard label="Donor pool" value={donors.length.toString()} delta="Active donors" trend="flat" icon={<Users size={18} />} />
-              <KpiCard
-                label="Critical requests"
-                value={criticalOpenRequests.length.toString()}
-                delta={criticalOpenRequests.length > 0 ? "Needs urgent action" : "None open"}
-                trend={criticalOpenRequests.length > 0 ? "down" : "up"}
-                icon={<AlertOctagon size={18} />}
-              />
+            {section === "dashboard" && (
+              <>
+            <div className="mt-7">
+              <StatGrid>
+                <Stat
+                  label="Open blood requests"
+                  value={openRequests.length.toString()}
+                  foot="Visible to donors"
+                />
+                <Stat
+                  label="Scheduled appointments"
+                  value={scheduledAppointments.length.toString()}
+                  foot="Upcoming visits"
+                />
+                <Stat label="Donor pool" value={donors.length.toString()} foot="Active donors" />
+                <Stat
+                  label="Critical requests"
+                  value={criticalOpenRequests.length.toString()}
+                  foot={criticalOpenRequests.length > 0 ? "Needs urgent action" : "None open"}
+                  tone={criticalOpenRequests.length > 0 ? "critical" : "good"}
+                />
+              </StatGrid>
             </div>
 
             <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_340px]">
@@ -419,234 +555,467 @@ export default function MedicalStaffPortalPage() {
                 />
               </DashboardCard>
             </div>
+              </>
+            )}
 
-            <div id="requests" className="mt-6 grid gap-6 lg:grid-cols-[360px_1fr]">
-              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-red-700">Raise a need</p>
-                <h2 className="mt-2 text-xl font-black text-slate-950">Create blood request</h2>
-                <form onSubmit={submitRequest} className="mt-5 space-y-4">
+            {section === "requests" && (
+              <div className="mt-6 grid gap-6 lg:grid-cols-[360px_1fr]">
+              <Panel label="Raise a need">
+                <h2 className="mt-3 text-[15px] font-bold text-slate-950">Create blood request</h2>
+
+                <form onSubmit={submitRequest} className="mt-5 space-y-3">
+                  <label htmlFor="rq-group" className="sr-only">
+                    Blood group
+                  </label>
                   <select
+                    id="rq-group"
                     value={requestForm.bloodGroup}
-                    onChange={(event) => setRequestForm({ ...requestForm, bloodGroup: event.target.value as BloodGroup })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
+                    onChange={(event) =>
+                      setRequestForm({ ...requestForm, bloodGroup: event.target.value as BloodGroup })
+                    }
+                    className={fieldClass}
                   >
                     {Object.entries(bloodGroupLabels).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
                     ))}
                   </select>
+
+                  <label htmlFor="rq-units" className="sr-only">
+                    Units needed
+                  </label>
                   <input
+                    id="rq-units"
                     required
                     type="number"
                     min={1}
                     value={requestForm.unitsNeeded}
-                    onChange={(event) => setRequestForm({ ...requestForm, unitsNeeded: event.target.value })}
+                    onChange={(event) =>
+                      setRequestForm({ ...requestForm, unitsNeeded: event.target.value })
+                    }
                     placeholder="Units needed"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
+                    className={fieldClass}
                   />
+
+                  <label htmlFor="rq-urgency" className="sr-only">
+                    Urgency
+                  </label>
                   <select
+                    id="rq-urgency"
                     value={requestForm.urgency}
-                    onChange={(event) => setRequestForm({ ...requestForm, urgency: event.target.value as Urgency })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
+                    onChange={(event) =>
+                      setRequestForm({ ...requestForm, urgency: event.target.value as Urgency })
+                    }
+                    className={fieldClass}
                   >
                     <option value="LOW">Low urgency</option>
                     <option value="MEDIUM">Medium urgency</option>
                     <option value="HIGH">High urgency</option>
                     <option value="CRITICAL">Critical urgency</option>
                   </select>
+
+                  <label htmlFor="rq-notes" className="sr-only">
+                    Notes for donors
+                  </label>
                   <textarea
+                    id="rq-notes"
                     value={requestForm.notes}
-                    onChange={(event) => setRequestForm({ ...requestForm, notes: event.target.value })}
+                    onChange={(event) =>
+                      setRequestForm({ ...requestForm, notes: event.target.value })
+                    }
                     placeholder="Notes for donors (optional)"
                     rows={3}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-[13.5px] transition focus:border-slate-500 focus:outline-none"
                   />
+
                   <button
                     disabled={submittingRequest}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-800 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-900 disabled:opacity-50"
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-950 text-[13px] font-semibold text-white transition hover:brightness-125 disabled:opacity-50"
                   >
                     <Droplet size={16} />
-                    {submittingRequest ? "Creating..." : "Create request"}
+                    {submittingRequest ? "Creating…" : "Create request"}
                   </button>
                 </form>
-              </section>
+              </Panel>
 
-              <div className="space-y-6">
-                <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <h2 className="text-lg font-bold text-slate-950">Blood requests</h2>
-                  {loading ? (
-                    <p className="mt-6 text-sm text-slate-500">Loading requests...</p>
-                  ) : requests.length === 0 ? (
-                    <p className="mt-6 rounded-xl bg-slate-50 p-6 text-sm text-slate-500">No blood requests yet.</p>
-                  ) : (
-                    <div className="mt-5 divide-y divide-slate-100">
-                      {requests.map((request) => (
-                        <div key={request.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
-                          <div>
-                            <p className="flex items-center gap-2 font-semibold text-slate-900">
-                              {bloodGroupLabels[request.bloodGroup]} · {request.unitsNeeded} unit{request.unitsNeeded > 1 ? "s" : ""}
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${urgencyStyles[request.urgency]}`}>
-                                {request.urgency}
-                              </span>
-                            </p>
-                            <p className="mt-1 text-sm text-slate-500">
-                              Requested by {request.requestedBy.firstName} {request.requestedBy.lastName} · {formatDate(request.createdAt)}
-                            </p>
-                            {request.notes && <p className="mt-1 text-sm text-slate-500">{request.notes}</p>}
+                <div className="space-y-6">
+                <Panel label="Blood requests" padded={false}>
+                  <div className="mt-5 border-t border-slate-100">
+                    {loading ? (
+                      <p className="px-6 py-8 text-sm text-slate-500">Loading requests…</p>
+                    ) : requests.length === 0 ? (
+                      <div className="p-6">
+                        <EmptyState
+                          title="No blood requests yet"
+                          description="Create one on the left and it becomes visible to matching donors."
+                        />
+                      </div>
+                    ) : (
+                      requests.map((request) => (
+                        <Row key={request.id}>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <RowTitle>
+                                {bloodGroupLabels[request.bloodGroup]} · {request.unitsNeeded} unit
+                                {request.unitsNeeded > 1 ? "s" : ""}
+                              </RowTitle>
+                              <Pill tone={urgencyTones[request.urgency]}>{request.urgency}</Pill>
+                            </div>
+
+                            <RowMeta>
+                              Requested by {request.requestedBy.firstName}{" "}
+                              {request.requestedBy.lastName} · {formatDate(request.createdAt)}
+                            </RowMeta>
+
+                            {request.notes && (
+                              <p className="mt-2 max-w-xl text-xs leading-5 text-slate-600">
+                                {request.notes}
+                              </p>
+                            )}
                           </div>
+
                           {request.status === "OPEN" ? (
-                            <div className="flex gap-2">
+                            <div className="flex shrink-0 gap-2">
                               <button
                                 onClick={() => updateRequestStatus(request.id, "FULFILLED")}
                                 disabled={actionId === request.id}
-                                className="rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+                                className={`${rowButtonClass} border-emerald-200 text-emerald-700 hover:bg-emerald-50`}
                               >
                                 Mark fulfilled
                               </button>
                               <button
                                 onClick={() => updateRequestStatus(request.id, "CANCELLED")}
                                 disabled={actionId === request.id}
-                                className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                                className={`${rowButtonClass} border-red-200 text-red-800 hover:bg-red-50`}
                               >
                                 Cancel
                               </button>
                             </div>
                           ) : (
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{request.status}</span>
+                            <Pill>{request.status}</Pill>
                           )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
+                        </Row>
+                      ))
+                    )}
+                  </div>
+                </Panel>
+                </div>
+              </div>
+            )}
 
-                <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <h2 className="text-lg font-bold text-slate-950">Appointments</h2>
-                  {loading ? (
-                    <p className="mt-6 text-sm text-slate-500">Loading appointments...</p>
-                  ) : appointments.length === 0 ? (
-                    <p className="mt-6 rounded-xl bg-slate-50 p-6 text-sm text-slate-500">No appointments booked yet.</p>
-                  ) : (
-                    <div className="mt-5 divide-y divide-slate-100">
-                      {appointments.map((appointment) => (
-                        <div key={appointment.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
-                          <div>
-                            <p className="font-semibold text-slate-900">
-                              {appointment.donor.firstName} {appointment.donor.lastName}
+            {section === "appointments" && (
+              <div className="mt-6">
+                <Panel label="Appointments" padded={false}>
+                  <div className="mt-5 border-t border-slate-100">
+                    {loading ? (
+                      <p className="px-6 py-8 text-sm text-slate-500">Loading appointments…</p>
+                    ) : appointments.length === 0 ? (
+                      <div className="p-6">
+                        <EmptyState
+                          title="No appointments booked yet"
+                          description="Donor bookings for your institute appear here."
+                        />
+                      </div>
+                    ) : (
+                      appointments.map((appointment) => (
+                        <Row key={appointment.id}>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <RowTitle>
+                                {appointment.donor.firstName} {appointment.donor.lastName}
+                              </RowTitle>
+
                               {appointment.donor.donorProfile?.bloodGroup && (
-                                <span className="ml-2 text-sm text-slate-500">
+                                <Pill tone="critical">
                                   {bloodGroupLabels[appointment.donor.donorProfile.bloodGroup]}
-                                </span>
+                                </Pill>
                               )}
-                            </p>
-                            <p className="mt-1 text-sm text-slate-500">
-                              {formatDate(appointment.appointmentDate)} at {appointment.appointmentTime} · {appointment.donor.email}
-                            </p>
+                            </div>
+
+                            <RowMeta>
+                              {formatDate(appointment.appointmentDate)} at{" "}
+                              {appointment.appointmentTime} · {appointment.donor.email}
+                            </RowMeta>
                           </div>
-                          {appointment.status === "SCHEDULED" ? (
-                            <div className="flex gap-2">
+
+                          {appointment.status === "SCHEDULED" || appointment.status === "CONFIRMED" ? (
+                            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                              <Pill tone={appointment.status === "CONFIRMED" ? "good" : "neutral"}>
+                                {appointment.status === "CONFIRMED" ? "Approved" : "Awaiting approval"}
+                              </Pill>
+
+                              {appointment.status === "SCHEDULED" && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    changeAppointment(
+                                      appointment.id,
+                                      { status: "CONFIRMED" },
+                                      `Appointment approved for ${appointment.donor.firstName} ${appointment.donor.lastName}. The donor has been notified.`,
+                                    )
+                                  }
+                                  disabled={actionId === appointment.id}
+                                  className={`${rowButtonClass} border-emerald-200 bg-emerald-50 text-emerald-700 hover:brightness-95`}
+                                >
+                                  Approve
+                                </button>
+                              )}
+
                               <button
-                                onClick={() => updateAppointmentStatus(appointment.id, "COMPLETED")}
+                                type="button"
+                                onClick={() => openReschedule(appointment)}
                                 disabled={actionId === appointment.id}
-                                className="rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+                                className={`${rowButtonClass} border-slate-300 text-slate-700 hover:bg-slate-50`}
+                              >
+                                Reschedule
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  changeAppointment(
+                                    appointment.id,
+                                    { status: "COMPLETED" },
+                                    "Appointment marked as completed.",
+                                  )
+                                }
+                                disabled={actionId === appointment.id}
+                                className={`${rowButtonClass} border-emerald-200 text-emerald-700 hover:bg-emerald-50`}
                               >
                                 Mark completed
                               </button>
+
                               <button
-                                onClick={() => updateAppointmentStatus(appointment.id, "CANCELLED")}
+                                type="button"
+                                onClick={() =>
+                                  changeAppointment(
+                                    appointment.id,
+                                    { status: "CANCELLED" },
+                                    "Appointment cancelled. The donor has been notified.",
+                                  )
+                                }
                                 disabled={actionId === appointment.id}
-                                className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                                className={`${rowButtonClass} border-red-200 text-red-800 hover:bg-red-50`}
                               >
                                 Cancel
                               </button>
                             </div>
                           ) : (
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{appointment.status}</span>
+                            <Pill tone={appointment.status === "COMPLETED" ? "good" : "neutral"}>
+                              {appointment.status === "COMPLETED" ? "Completed" : "Cancelled"}
+                            </Pill>
                           )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
+                        </Row>
+                      ))
+                    )}
+                  </div>
+                </Panel>
+              </div>
+            )}
 
-                <section id="donors" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <h2 className="text-lg font-bold text-slate-950">Donor directory</h2>
-                    <div className="relative">
-                      <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            {section === "donors" && (
+              <div className="mt-6">
+                <Panel
+                  label="Donor directory"
+                  padded={false}
+                  action={
+                    <div className="flex flex-wrap items-center gap-2">
+                    <label htmlFor="donor-compatible" className="sr-only">
+                      Can donate to
+                    </label>
+                    <select
+                      id="donor-compatible"
+                      value={donorCompatibleWith}
+                      onChange={(event) => setDonorCompatibleWith(event.target.value as BloodGroup | "")}
+                      className="h-9 rounded-lg border border-slate-300 px-2.5 text-[13px] transition focus:border-slate-500 focus:outline-none"
+                    >
+                      <option value="">Any blood group</option>
+                      {Object.entries(bloodGroupLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          Can give to {label} patient
+                        </option>
+                      ))}
+                    </select>
+                    <label className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 text-[13px] text-slate-700">
                       <input
+                        type="checkbox"
+                        checked={donorEligibleOnly}
+                        onChange={(event) => setDonorEligibleOnly(event.target.checked)}
+                      />
+                      Eligible only
+                    </label>
+                    <div className="relative">
+                      <Search
+                        size={15}
+                        aria-hidden
+                        className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-slate-400"
+                      />
+                      <label htmlFor="donor-search" className="sr-only">
+                        Search donors
+                      </label>
+                      <input
+                        id="donor-search"
                         value={donorSearch}
                         onChange={(event) => setDonorSearch(event.target.value)}
-                        placeholder="Search donors..."
-                        className="rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm"
+                        placeholder="Search donors…"
+                        className="h-9 rounded-lg border border-slate-300 pr-3 pl-9 text-[13px] transition focus:border-slate-500 focus:outline-none"
                       />
                     </div>
-                  </div>
-                  {loading ? (
-                    <p className="mt-6 text-sm text-slate-500">Loading donors...</p>
-                  ) : donors.length === 0 ? (
-                    <p className="mt-6 rounded-xl bg-slate-50 p-6 text-sm text-slate-500">No donors found.</p>
-                  ) : (
-                    <div className="mt-5 divide-y divide-slate-100">
-                      {donors.map((donor) => (
-                        <div key={donor.id} className="flex flex-wrap items-center justify-between gap-4 py-4">
-                          <div>
-                            <p className="font-semibold text-slate-900">{donor.firstName} {donor.lastName}</p>
-                            <p className="mt-1 text-sm text-slate-500">
-                              {donor.email} · {donor.donorProfile?.city ?? "No city on file"}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-800">
-                              {donor.donorProfile?.bloodGroup ? bloodGroupLabels[donor.donorProfile.bloodGroup] : "Unknown"}
-                            </span>
-                            <span className={`rounded-full px-3 py-1 text-xs font-bold ${donor.donorProfile?.eligibilityStatus ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                              {donor.donorProfile?.eligibilityStatus ? "Eligible" : "Not eligible"}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
                     </div>
-                  )}
-                </section>
+                  }
+                >
+                  <div className="mt-5 border-t border-slate-100">
+                    {!donorsLoaded ? (
+                      <p className="px-6 py-8 text-sm text-slate-500">Loading donors…</p>
+                    ) : donors.length === 0 ? (
+                      <div className="p-6">
+                        <EmptyState
+                          title="No donors found"
+                          description="Try a different search or filter."
+                        />
+                      </div>
+                    ) : (
+                      donors.map((donor) => (
+                        <Row key={donor.id}>
+                          <div className="min-w-0">
+                            <RowTitle>
+                              {donor.firstName} {donor.lastName}
+                            </RowTitle>
+
+                            <RowMeta>
+                              {donor.email} · {donor.donorProfile?.city ?? "No city on file"} ·{" "}
+                              {donor.donationsCount ?? 0} donation
+                              {(donor.donationsCount ?? 0) === 1 ? "" : "s"}
+                            </RowMeta>
+                          </div>
+
+                          <div className="flex shrink-0 items-center gap-2.5">
+                            {getConsultationProgress(donor.donationsCount ?? 0).earned > 0 && (
+                              <Pill tone="good">
+                                {getConsultationProgress(donor.donationsCount ?? 0).earned} free
+                                consultation
+                                {getConsultationProgress(donor.donationsCount ?? 0).earned === 1
+                                  ? ""
+                                  : "s"}
+                              </Pill>
+                            )}
+
+                            <Pill tone="critical">
+                              {donor.donorProfile?.bloodGroup
+                                ? bloodGroupLabels[donor.donorProfile.bloodGroup]
+                                : "Unknown"}
+                            </Pill>
+
+                            <Pill tone={donor.donorProfile?.eligibilityStatus ? "good" : "neutral"}>
+                              {donor.donorProfile?.eligibilityStatus ? "Eligible" : "Not eligible"}
+                            </Pill>
+
+                            <button
+                              onClick={() => contactDonor(donor.id)}
+                              disabled={contactingId === donor.id}
+                              className={`${rowButtonClass} gap-1.5 border-slate-300 text-slate-700 hover:bg-slate-50`}
+                            >
+                              <MessageCircle size={13} />
+                              {contactingId === donor.id ? "Opening…" : "Message"}
+                            </button>
+                          </div>
+                        </Row>
+                      ))
+                    )}
+                  </div>
+                </Panel>
               </div>
-            </div>
-          </section>
+            )}
+
+          </div>
+      {rescheduling && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="staff-reschedule-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"
+        >
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-950">Reschedule</p>
+
+            <h2 id="staff-reschedule-title" className="mt-2 text-xl font-bold text-slate-950">
+              Move this appointment
+            </h2>
+
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              {rescheduling.donor.firstName} {rescheduling.donor.lastName} ·{" "}
+              {formatDate(rescheduling.appointmentDate)} at {rescheduling.appointmentTime}
+            </p>
+
+            <form onSubmit={submitReschedule} className="mt-6 space-y-5">
+              <div>
+                <label htmlFor="staff-new-date" className="mb-2 block text-xs font-bold text-slate-700">
+                  New date
+                </label>
+                <input
+                  id="staff-new-date"
+                  type="date"
+                  required
+                  value={newDate}
+                  onChange={(event) => {
+                    setNewDate(event.target.value);
+                    setRescheduleError("");
+                  }}
+                  className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm text-slate-700 outline-none focus:border-red-950"
+                />
+              </div>
+
+              <div>
+                <span className="mb-2 block text-xs font-bold text-slate-700">New time</span>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {APPOINTMENT_TIMES.map((time) => (
+                    <button
+                      key={time}
+                      type="button"
+                      onClick={() => {
+                        setNewTime(time);
+                        setRescheduleError("");
+                      }}
+                      className={`h-10 rounded-xl border text-xs font-semibold ${
+                        newTime === time
+                          ? "border-red-950 bg-red-950 text-white"
+                          : "border-slate-200 bg-white text-slate-700"
+                      }`}
+                    >
+                      {time}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {rescheduleError && (
+                <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs font-medium text-red-700">
+                  {rescheduleError}
+                </p>
+              )}
+
+              <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+                <button
+                  type="button"
+                  onClick={() => setRescheduling(null)}
+                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-600"
+                >
+                  Keep current time
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={actionId === rescheduling.id}
+                  className="h-10 rounded-xl bg-red-950 px-4 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  {actionId === rescheduling.id ? "Moving..." : "Move appointment"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </section>
-    </main>
-  );
-}
-
-function NavItem({
-  href,
-  label,
-  icon,
-  active = false,
-}: {
-  href: string;
-  label: string;
-  icon: ReactNode;
-  active?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      style={active ? { backgroundColor: PRIMARY_RED } : undefined}
-      className={`flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${
-        active ? "text-white" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-      }`}
-    >
-      {icon}
-      {label}
-    </Link>
-  );
-}
-
-function LogoutIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M10 5H5v14h5" />
-      <path d="M14 8l4 4-4 4M18 12H9" />
-    </svg>
+      )}
+    </PortalShell>
   );
 }

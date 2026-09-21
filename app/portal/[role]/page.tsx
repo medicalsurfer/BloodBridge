@@ -54,7 +54,14 @@ export default async function RolePortalPage({
   }
 
   if (authentication.user.role !== content.role) {
-    redirect("/home");
+    const redirectByRole: Record<string, string> = {
+      DONOR: "/home",
+      MEDICAL_STAFF: "/portal/medical-staff",
+      LAB_TECHNICIAN: "/portal/lab-technician",
+      HEALTH_INSTITUTE_ADMIN: "/portal/institute-admin",
+      SYSTEM_ADMIN: "/system-admin",
+    };
+    redirect(redirectByRole[authentication.user.role] ?? "/home");
   }
 
   return (

@@ -1,3 +1,5 @@
+import { completeChat } from "./ai-client";
+
 const bloodGroups = [
   "A_POSITIVE",
   "A_NEGATIVE",
@@ -66,29 +68,18 @@ export function buildRuleBasedRecommendations(input: {
 }
 
 /**
- * Optionally asks an external AI API to phrase a short natural-language
- * summary of the rule-based analysis above. This is the "AI API"
- * integration shown in the BloodBridge use case diagram.
+ * Optionally asks the configured AI provider (see ai-client.ts) to phrase a
+ * short natural-language summary of the rule-based analysis above. This is
+ * the "AI API" integration shown in the BloodBridge use case diagram.
  *
- * Configure with AI_API_KEY (and optionally AI_API_URL / AI_API_MODEL,
- * which default to Anthropic's Messages API). If no key is configured,
- * or the request fails for any reason, this returns null and the caller
- * should fall back to the rule-based recommendations alone - the feature
- * must keep working without a paid API key.
+ * If the provider is unavailable this returns null and the caller falls back
+ * to the rule-based recommendations alone (FR-41). The summary is decision
+ * support only and never overrides staff judgement (FR-42).
  */
 export async function generateAiSummary(
   recommendations: BloodGroupRecommendation[],
   instituteName: string,
 ): Promise<string | null> {
-  const apiKey = process.env.AI_API_KEY;
-
-  if (!apiKey) {
-    return null;
-  }
-
-  const apiUrl = process.env.AI_API_URL ?? "https://api.anthropic.com/v1/messages";
-  const model = process.env.AI_API_MODEL ?? "claude-3-5-haiku-latest";
-
   const priorityOrder: RecommendationPriority[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "OK"];
   const summaryLines = [...recommendations]
     .sort((a, b) => priorityOrder.indexOf(a.priority) - priorityOrder.indexOf(b.priority))
@@ -98,43 +89,21 @@ export async function generateAiSummary(
     )
     .join("\n");
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
-
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+  return completeChat(
+    [
+      {
+        role: "system",
+        content:
+          "You are a blood bank supply analyst on the BloodBridge platform. Write short, plain-English decision-support notes for laboratory staff. Staff make the final decisions.",
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: 300,
-        messages: [
-          {
-            role: "user",
-            content: `You are a blood bank supply analyst for ${instituteName}, part of the BloodBridge platform. Based on this per-blood-group stock data, write a short (3-4 sentence) plain-English recommendation for the laboratory team on what to prioritise this week. Be specific about blood groups and don't repeat the raw numbers back verbatim.\n\n${summaryLines}`,
-          },
-        ],
-      }),
-      signal: controller.signal,
-    });
+      {
+        role: "user",
+        content: `Stock data for ${instituteName}:
+${summaryLines}
 
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      console.error("AI RECOMMENDATION API ERROR:", response.status, await response.text());
-      return null;
-    }
-
-    const data = await response.json();
-    const text = data?.content?.[0]?.text;
-
-    return typeof text === "string" ? text.trim() : null;
-  } catch (error) {
-    console.error("AI RECOMMENDATION REQUEST FAILED:", error);
-    return null;
-  }
+In 3-4 sentences, recommend what the laboratory team should prioritise this week. Be specific about blood groups and don't repeat the raw numbers back verbatim.`,
+      },
+    ],
+    { maxTokens: 300, timeoutMs: 60_000 },
+  );
 }

@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "AppointmentStatus" ADD VALUE 'CONFIRMED';
+
+-- AlterEnum
+ALTER TYPE "AuditAction" ADD VALUE 'APPOINTMENT_CONFIRMED';

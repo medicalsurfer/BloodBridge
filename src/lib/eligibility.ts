@@ -5,6 +5,7 @@ export type EligibilityAnswers = {
   medicalCondition: string;
   medication: string;
   pregnancyStatus: string;
+  hasDonatedBefore: string;
   lastDonationDate: string;
   recentProcedure: string;
   infectionRisk: string;
@@ -13,6 +14,38 @@ export type EligibilityAnswers = {
 export type EligibilityStatus = "ELIGIBLE" | "TEMPORARILY_DEFERRED" | "MEDICAL_REVIEW";
 
 export const MIN_DAYS_BETWEEN_DONATIONS = 56; // 8 weeks
+
+/*
+  How long a completed screening stays usable.
+
+  A stored assessment lets a donor who has just been screened go straight to
+  booking instead of answering the same questions again. But the answers are a
+  statement about how the donor feels *now* — "I am currently feeling well",
+  "I have no fever" — so reusing them indefinitely would let a stale
+  declaration authorise a donation. One day is the compromise: long enough
+  that the screen-then-book journey never asks twice, short enough that the
+  declaration still describes the donor in front of the nurse.
+
+  Both the UI and the appointment endpoint enforce this, so the rule cannot be
+  bypassed by skipping the form in the client.
+*/
+export const ELIGIBILITY_VALID_FOR_MS = 24 * 60 * 60 * 1000;
+
+export function isAssessmentFresh(createdAt: Date | string | null | undefined): boolean {
+  if (!createdAt) return false;
+
+  const taken = createdAt instanceof Date ? createdAt : new Date(createdAt);
+
+  if (Number.isNaN(taken.getTime())) return false;
+
+  return Date.now() - taken.getTime() < ELIGIBILITY_VALID_FOR_MS;
+}
+
+export function assessmentExpiresAt(createdAt: Date | string): Date {
+  const taken = createdAt instanceof Date ? createdAt : new Date(createdAt);
+
+  return new Date(taken.getTime() + ELIGIBILITY_VALID_FOR_MS);
+}
 
 export type EligibilityResult = {
   status: EligibilityStatus;

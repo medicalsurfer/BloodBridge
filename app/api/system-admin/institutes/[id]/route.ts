@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../../src/lib/prisma";
 import { getAuthenticatedUser } from "../../../../../src/lib/auth";
 import { logAudit } from "../../../../../src/lib/audit";
+import { id as isValidId } from "@/src/lib/input";
 
 export async function PATCH(
   request: NextRequest,
@@ -26,7 +27,12 @@ export async function PATCH(
   }
 
   try {
-    const { id } = await context.params;
+    const { id: rawId } = await context.params;
+    const id = isValidId(rawId);
+
+    if (!id) {
+      return NextResponse.json({ error: "Invalid identifier." }, { status: 400 });
+    }
     const body = await request.json();
 
     if (typeof body.isActive !== "boolean") {

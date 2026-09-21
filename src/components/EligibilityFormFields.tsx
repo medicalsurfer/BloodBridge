@@ -7,6 +7,7 @@ export type EligibilityAnswers = {
   medicalCondition: string;
   medication: string;
   pregnancyStatus: string;
+  hasDonatedBefore: string;
   lastDonationDate: string;
   recentProcedure: string;
   infectionRisk: string;
@@ -19,6 +20,7 @@ export const emptyEligibilityAnswers: EligibilityAnswers = {
   medicalCondition: "",
   medication: "",
   pregnancyStatus: "",
+  hasDonatedBefore: "",
   lastDonationDate: "",
   recentProcedure: "",
   infectionRisk: "",
@@ -64,11 +66,19 @@ export function requiredEligibilityFieldsMissing(answers: EligibilityAnswers) {
     answers.medicalCondition,
     answers.medication,
     answers.pregnancyStatus,
+    answers.hasDonatedBefore,
     answers.recentProcedure,
     answers.infectionRisk,
   ];
 
-  return requiredAnswers.some((answer) => answer.trim() === "");
+  if (requiredAnswers.some((answer) => answer.trim() === "")) {
+    return true;
+  }
+
+  // A donor who says they have donated before must say when: the 8-week
+  // interval cannot be checked without the date, and treating a blank as
+  // "never donated" would silently clear a real deferral.
+  return answers.hasDonatedBefore === "YES" && answers.lastDonationDate.trim() === "";
 }
 
 type Props = {
@@ -113,11 +123,28 @@ export default function EligibilityFormFields({ answers, onChange }: Props) {
         onChange={(value) => onChange("pregnancyStatus", value)}
       />
 
-      <DonationDateInput
-        value={answers.lastDonationDate}
-        onChange={(value) => onChange("lastDonationDate", value)}
-        daysRemaining={daysRemaining}
+      <Question
+        label="Have you ever donated blood before?"
+        value={answers.hasDonatedBefore}
+        onChange={(value) => {
+          onChange("hasDonatedBefore", value);
+
+          // Answering "No" retracts any date already entered, so a donor who
+          // changes their mind cannot leave a stale date behind that would
+          // still be scored against the 8-week interval.
+          if (value === "NO") {
+            onChange("lastDonationDate", "");
+          }
+        }}
       />
+
+      {answers.hasDonatedBefore === "YES" && (
+        <DonationDateInput
+          value={answers.lastDonationDate}
+          onChange={(value) => onChange("lastDonationDate", value)}
+          daysRemaining={daysRemaining}
+        />
+      )}
 
       <Question
         label="Have you recently had surgery, a blood transfusion, tattoo, or piercing?"
@@ -224,14 +251,16 @@ function DonationDateInput({
   const today = new Date().toISOString().split("T")[0];
 
   return (
-    <div>
+    <div
+      className="border-l-2 border-garnet/25 pl-4"
+      style={{ animation: "var(--animate-rise)" }}
+    >
       <label htmlFor="lastDonationDate" className="block text-sm font-semibold text-slate-800">
         When did you last donate blood?
       </label>
 
       <p className="mt-1 text-xs text-slate-500">
-        Leave this blank if you have never donated blood. A minimum of 8 weeks (56 days) is
-        required between whole blood donations.
+        A minimum of 8 weeks (56 days) is required between whole blood donations.
       </p>
 
       <input

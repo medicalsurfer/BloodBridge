@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clientIp, LIMITS, rateLimit } from "@/src/lib/rate-limit";
 
 import bcrypt from "bcryptjs";
 
@@ -13,7 +14,10 @@ function isAllowedEmail(email: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  const limited = rateLimit(`register:${clientIp(request)}`, LIMITS.register.limit, LIMITS.register.windowMs);
+  if (limited) return limited;
+
+  const body = await request.json().catch(() => ({}));
 
   const { firstName, lastName, email, password, phone } = body;
 

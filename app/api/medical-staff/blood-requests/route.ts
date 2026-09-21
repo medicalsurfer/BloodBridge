@@ -3,6 +3,10 @@ import { prisma } from "../../../../src/lib/prisma";
 import { getAuthenticatedMedicalStaff } from "../../../../src/lib/auth";
 import { notifyUsers } from "../../../../src/lib/notifications";
 import { logAudit } from "../../../../src/lib/audit";
+import { sendBloodRequestAlertEmail } from "../../../../src/lib/mail";
+import { compatibleDonorGroups } from "@/src/lib/blood-compatibility";
+import { sendSms } from "@/src/lib/sms";
+import { text } from "@/src/lib/input";
 
 const bloodGroups = [
   "A_POSITIVE",
@@ -46,7 +50,7 @@ export async function POST(request: NextRequest) {
   const bloodGroup = body.bloodGroup as (typeof bloodGroups)[number];
   const unitsNeeded = Number(body.unitsNeeded);
   const urgency = (body.urgency as (typeof urgencies)[number]) ?? "MEDIUM";
-  const notes = String(body.notes ?? "").trim();
+  const notes = text(body.notes, 1000);
 
   if (!bloodGroups.includes(bloodGroup)) {
     return NextResponse.json({ error: "A valid blood group is required." }, { status: 400 });
@@ -71,6 +75,7 @@ export async function POST(request: NextRequest) {
     },
     include: {
       requestedBy: { select: { firstName: true, lastName: true } },
+      healthInstitute: { select: { name: true } },
     },
   });
 
@@ -86,9 +91,9 @@ export async function POST(request: NextRequest) {
     where: {
       role: "DONOR",
       isActive: true,
-      donorProfile: { bloodGroup, eligibilityStatus: true },
+      donorProfile: { bloodGroup: { in: compatibleDonorGroups(bloodGroup) }, eligibilityStatus: true },
     },
-    select: { id: true },
+    select: { id: true, email: true, firstName: true, phoneNumber: true },
     take: 250,
   });
 
@@ -99,10 +104,41 @@ export async function POST(request: NextRequest) {
     {
       type: "BLOOD_REQUEST",
       title: `${urgencyLabel} priority blood request`,
-      message: `A health institute needs ${unitsNeeded} unit${unitsNeeded === 1 ? "" : "s"} of your blood type. Check current requests to help.`,
+      message: `A health institute needs ${unitsNeeded} unit${unitsNeeded === 1 ? "" : "s"} of blood your type can supply. Check current requests to help.`,
       link: "/request",
     },
   );
+
+  // Email alerts are reserved for higher-urgency requests so donors aren't
+  // spammed for every low-priority ask, and capped to keep this request
+  // fast; every matching donor still gets the in-app notification above.
+  if (urgency === "HIGH" || urgency === "CRITICAL") {
+    const emailRecipients = matchingDonors.slice(0, 25);
+
+    // No blood group or medical detail in the SMS (FR-46); the app shows the rest.
+    await sendSms(
+      emailRecipients.map((donor) => donor.phoneNumber),
+      `BloodBridge: ${bloodRequest.healthInstitute.name} urgently needs donors your blood type can help. Open BloodBridge to respond.`,
+    );
+
+    await Promise.allSettled(
+      emailRecipients.map((donor) =>
+        sendBloodRequestAlertEmail({
+          recipient: donor.email,
+          firstName: donor.firstName,
+          instituteName: bloodRequest.healthInstitute.name,
+          bloodGroup,
+          unitsNeeded,
+          urgency,
+        }),
+      ),
+    ).then((results) => {
+      const failures = results.filter((result) => result.status === "rejected");
+      if (failures.length > 0) {
+        console.error("BLOOD REQUEST ALERT EMAIL ERRORS:", failures.length);
+      }
+    });
+  }
 
   return NextResponse.json({ request: bloodRequest }, { status: 201 });
 }
@@ -114,7 +150,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: authentication.error }, { status: authentication.status });
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => ({}));
   const id = String(body.id ?? "");
   const status = body.status as "FULFILLED" | "CANCELLED";
 
@@ -130,12 +166,24 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Blood request not found." }, { status: 404 });
   }
 
+  if (existing.status !== "OPEN") {
+    return NextResponse.json({ error: "Only open requests can be updated." }, { status: 400 });
+  }
+
   const bloodRequest = await prisma.bloodRequest.update({
     where: { id },
     data: { status },
     include: {
       requestedBy: { select: { firstName: true, lastName: true } },
     },
+  });
+
+  await logAudit({
+    actorId: authentication.user.id,
+    action: "BLOOD_REQUEST_UPDATED",
+    targetType: "BloodRequest",
+    targetId: id,
+    metadata: { from: existing.status, to: status },
   });
 
   return NextResponse.json({ request: bloodRequest });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { getAuthenticatedChatParticipant } from "@/src/lib/chat";
 import { notifyUser, notifyUsers } from "@/src/lib/notifications";
+import { id as isValidId } from "@/src/lib/input";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -45,7 +46,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const { id } = await context.params;
+  const { id: rawId } = await context.params;
+    const id = isValidId(rawId);
+
+    if (!id) {
+      return NextResponse.json({ error: "Invalid identifier." }, { status: 400 });
+    }
   const conversation = await loadConversationForParticipant(id, authentication.user);
 
   if (conversation === null) {
@@ -89,7 +95,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const { id } = await context.params;
+  const { id: rawId } = await context.params;
+    const id = isValidId(rawId);
+
+    if (!id) {
+      return NextResponse.json({ error: "Invalid identifier." }, { status: 400 });
+    }
   const conversation = await loadConversationForParticipant(id, authentication.user);
 
   if (conversation === null) {

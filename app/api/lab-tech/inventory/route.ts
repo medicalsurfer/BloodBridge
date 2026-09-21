@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../src/lib/prisma";
 import { getAuthenticatedLabTechnician } from "../../../../src/lib/auth";
+import { logAudit } from "../../../../src/lib/audit";
 
 const bloodGroups = [
   "A_POSITIVE",
@@ -43,7 +44,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: authentication.error }, { status: authentication.status });
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => ({}));
   const bloodGroup = body.bloodGroup as (typeof bloodGroups)[number];
   const delta = Number(body.delta);
 
@@ -83,6 +84,14 @@ export async function PATCH(request: NextRequest) {
     update: {
       units: { increment: delta },
     },
+  });
+
+  await logAudit({
+    actorId: authentication.user.id,
+    action: "INVENTORY_ADJUSTED",
+    targetType: "BloodInventory",
+    targetId: updated.id,
+    metadata: { bloodGroup, delta, units: updated.units },
   });
 
   return NextResponse.json({ inventory: updated });

@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     prisma.appointment.count({
       where: {
         healthInstituteId,
-        status: "SCHEDULED",
+        status: { in: ["SCHEDULED", "CONFIRMED"] },
         appointmentDate: { gte: today },
       },
     }),

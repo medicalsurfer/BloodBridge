@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/src/lib/prisma";
 import {
-  KpiCard,
   TrendAreaChart,
   WeekdayBarChart,
   BreakdownBar,
@@ -12,6 +11,14 @@ import {
   formatRelativeTime,
   type ActivityItem,
 } from "@/src/components/dashboard/DashboardWidgets";
+import {
+  PageHeader,
+  StatGrid,
+  Stat,
+  PrimaryLink,
+  SecondaryLink,
+  EmptyState,
+} from "@/src/components/ui/Page";
 
 const PRIMARY_RED = "oklch(27.1% 0.105 12.094)";
 
@@ -59,6 +66,13 @@ const activityMeta: Record<
   BLOOD_REQUEST_CREATED: { verb: "opened a blood request", badgeClassName: "bg-red-50 text-red-700", icon: <DropletIcon /> },
   REWARD_VALIDATED: { verb: "validated a donation reward", badgeClassName: "bg-purple-50 text-purple-700", icon: <AwardIcon /> },
   REWARD_REJECTED: { verb: "rejected a donation reward", badgeClassName: "bg-slate-100 text-slate-500", icon: <AwardIcon /> },
+  APPOINTMENT_CONFIRMED: { verb: "confirmed an appointment", badgeClassName: "bg-emerald-50 text-emerald-700", icon: <CalendarIcon /> },
+  APPOINTMENT_COMPLETED: { verb: "completed an appointment", badgeClassName: "bg-emerald-50 text-emerald-700", icon: <CalendarIcon /> },
+  BLOOD_REQUEST_UPDATED: { verb: "updated a blood request", badgeClassName: "bg-red-50 text-red-700", icon: <DropletIcon /> },
+  INVENTORY_ADJUSTED: { verb: "adjusted blood stock", badgeClassName: "bg-emerald-50 text-emerald-700", icon: <DropletIcon /> },
+  PASSWORD_RESET_REQUESTED: { verb: "requested a password reset", badgeClassName: "bg-slate-100 text-slate-500", icon: <UsersIcon /> },
+  PASSWORD_RESET_COMPLETED: { verb: "reset their password", badgeClassName: "bg-slate-100 text-slate-500", icon: <UsersIcon /> },
+  PASSWORD_CHANGED: { verb: "changed their password", badgeClassName: "bg-slate-100 text-slate-500", icon: <UsersIcon /> },
 };
 
 export const dynamic = "force-dynamic";
@@ -195,80 +209,42 @@ export default async function SystemAdminPage() {
 
   return (
     <>
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <PageHeader
+        eyebrow="Administration"
+        title="Platform overview"
+        description="Manage health institutes, institutional administrators and access to the BloodBridge platform."
+        actions={
+          <>
+            <SecondaryLink href="/system-admin/invitations/new">Invite admin</SecondaryLink>
+            <PrimaryLink href="/system-admin/institutes/new">Add health institute</PrimaryLink>
+          </>
+        }
+      />
 
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-950">
-            Administration
-          </p>
-
-          <h1 className="mt-2 text-3xl font-bold text-slate-950">
-            System Admin Dashboard
-          </h1>
-
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-            Manage health institutes, institutional administrators and
-            access to the BloodBridge platform.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-
-          <Link
-            href="/system-admin/invitations/new"
-            className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            <MailIcon />
-
-            Invite admin
-          </Link>
-
-          <Link
-            href="/system-admin/institutes/new"
-            style={{ backgroundColor: PRIMARY_RED }}
-            className="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-xs font-semibold text-white transition hover:brightness-125"
-          >
-            <PlusIcon />
-
-            Add health institute
-          </Link>
-        </div>
-      </div>
-
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-
-        <KpiCard
-          label="Health institutes"
-          value={totalInstitutes.toString()}
-          delta={institutesTrend?.delta}
-          trend={institutesTrend?.trend}
-          icon={<HospitalIcon />}
-        />
-
-        <KpiCard
-          label="Institute admins"
-          value={instituteAdmins.toString()}
-          delta={`${activeInstitutes} active institutes`}
-          trend="flat"
-          icon={<UsersIcon />}
-        />
-
-        <KpiCard
-          label="Platform users"
-          value={totalUsers.toString()}
-          delta={usersTrend?.delta}
-          trend={usersTrend?.trend}
-          icon={<UsersIcon />}
-        />
-
-        <KpiCard
-          label="Pending institutes"
-          value={pendingInstitutes.toString()}
-          delta={pendingInstitutes > 0 ? "Needs review" : "All clear"}
-          trend={pendingInstitutes > 0 ? "down" : "up"}
-          icon={<ClockIcon />}
-        />
-
+      <div className="mt-7">
+        <StatGrid>
+          <Stat
+            label="Health institutes"
+            value={totalInstitutes.toString()}
+            foot={institutesTrend?.delta ?? `${activeInstitutes} active`}
+          />
+          <Stat
+            label="Institute admins"
+            value={instituteAdmins.toString()}
+            foot={`${activeInstitutes} active institutes`}
+          />
+          <Stat
+            label="Platform users"
+            value={totalUsers.toString()}
+            foot={usersTrend?.delta ?? "All roles"}
+          />
+          <Stat
+            label="Pending institutes"
+            value={pendingInstitutes.toString()}
+            foot={pendingInstitutes > 0 ? "Needs review" : "All clear"}
+            tone={pendingInstitutes > 0 ? "warn" : "good"}
+          />
+        </StatGrid>
       </div>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_340px]">
@@ -318,15 +294,10 @@ export default async function SystemAdminPage() {
           }
         >
           {totalBloodUnits === 0 ? (
-            <div className="flex flex-col items-center py-6 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-950">
-                <DropletIcon />
-              </div>
-
-              <p className="mt-3 text-xs font-semibold text-slate-500">
-                No inventory recorded across institutes yet.
-              </p>
-            </div>
+            <EmptyState
+              title="No inventory recorded"
+              description="Blood units logged by institutes will break down here by group."
+            />
           ) : (
             <BreakdownBar segments={bloodSupplySegments} />
           )}
@@ -385,22 +356,6 @@ function MailIcon() {
   );
 }
 
-function PlusIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <path
-        d="M12 5v14M5 12h14"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 function ClockIcon() {
   return (

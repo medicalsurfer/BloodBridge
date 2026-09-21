@@ -88,8 +88,8 @@ export default function RegisterPage() {
 
   return (
     <main className="h-screen overflow-hidden bg-slate-100 p-2">
-      <section className="mx-auto h-[calc(100vh-1rem)] max-w-[1500px] rounded-[24px] border border-white bg-slate-200/70 p-2 shadow-xl">
-        <div className="grid h-full overflow-hidden rounded-[20px] bg-white lg:grid-cols-[1fr_1.05fr]">
+      <section className="mx-auto h-[calc(100vh-1rem)] max-w-[1500px] rounded-3xl border border-white bg-slate-200/70 p-2 shadow-xl">
+        <div className="grid h-full overflow-hidden rounded-2xl bg-white lg:grid-cols-[1fr_1.05fr]">
 
           {/* LEFT SIDE */}
           <div className="flex h-full min-h-0 flex-col px-6 py-5 sm:px-10 lg:px-12 xl:px-16">
@@ -510,7 +510,7 @@ function RegistrationPanel() {
         </div>
 
         {/* WHITE CARD */}
-        <div className="rounded-[24px] border border-white/20 bg-white/95 p-4 text-slate-900 shadow-2xl">
+        <div className="rounded-3xl border border-white/20 bg-white/95 p-4 text-slate-900 shadow-2xl">
           <div className="mb-3 flex items-center justify-between">
             <div>
               <p className="text-[8px] font-bold uppercase tracking-[0.15em] text-slate-400">

@@ -1,20 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FlaskConical, LayoutDashboard, Minus, Plus, RefreshCw, Sparkles } from "lucide-react";
 import {
-  Activity,
-  AlertTriangle,
-  Droplet,
-  FlaskConical,
-  LayoutDashboard,
-  Minus,
-  Plus,
-  RefreshCw,
-  Sparkles,
-} from "lucide-react";
-import {
-  KpiCard,
   TrendAreaChart,
   WeekdayBarChart,
   RadialGauge,
@@ -23,9 +12,30 @@ import {
   bucketByDay,
   weekdayCounts,
 } from "@/src/components/dashboard/DashboardWidgets";
+import { PortalShell, type PortalNavGroup } from "@/src/components/dashboard/PortalShell";
+import {
+  PageHeader,
+  StatGrid,
+  Stat,
+  Panel,
+  Row,
+  RowTitle,
+  RowMeta,
+  Pill,
+  Eyebrow,
+  EmptyState,
+  type PillTone,
+} from "@/src/components/ui/Page";
 
 const PRIMARY_RED = "oklch(27.1% 0.105 12.094)";
 const LOW_STOCK_THRESHOLD = 5;
+
+// One field and one stepper style for the whole workspace.
+const fieldClass =
+  "h-11 w-full rounded-xl border border-slate-300 px-3.5 text-[13.5px] transition focus:border-slate-500 focus:outline-none";
+
+const stepperClass =
+  "flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40";
 
 type BloodGroup =
   | "A_POSITIVE"
@@ -97,12 +107,12 @@ const bloodGroupColors: Record<BloodGroup, string> = {
   O_NEGATIVE: "oklch(75% 0.02 260)",
 };
 
-const priorityStyles: Record<RecommendationPriority, string> = {
-  CRITICAL: "bg-red-50 text-red-700",
-  HIGH: "bg-orange-50 text-orange-700",
-  MEDIUM: "bg-amber-50 text-amber-700",
-  LOW: "bg-slate-100 text-slate-600",
-  OK: "bg-emerald-50 text-emerald-700",
+const priorityTones: Record<RecommendationPriority, PillTone> = {
+  CRITICAL: "critical",
+  HIGH: "warn",
+  MEDIUM: "warn",
+  LOW: "neutral",
+  OK: "good",
 };
 
 function formatDate(value: string) {
@@ -292,102 +302,123 @@ export default function LabTechnicianPortalPage() {
     }
   }
 
+  useEffect(() => {
+    function applyHash() {
+      setActiveTab(window.location.hash === "#processing" ? "processing" : "dashboard");
+    }
+
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
+
+  const labNav: PortalNavGroup[] = [
+    {
+      label: "Workspace",
+      links: [
+        {
+          href: "#dashboard",
+          label: "Dashboard",
+          icon: <LayoutDashboard size={16} />,
+        },
+        {
+          href: "#processing",
+          label: "Processing",
+          icon: <FlaskConical size={16} />,
+        },
+        {
+          href: "/portal/lab-technician/ai-recommendations",
+          label: "AI recommendations",
+          icon: <Sparkles size={16} />,
+        },
+      ],
+    },
+  ];
+
   return (
-    <main className="h-screen overflow-hidden bg-slate-100 p-4">
-      <section className="mx-auto flex h-full max-w-375 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <PortalShell
+      brandHref="/portal/lab-technician"
+      title="Laboratory workspace"
+      subtitle="Donation processing and blood inventory"
+      navGroups={labNav}
+      activeHref={activeTab === "dashboard" ? "#dashboard" : "#processing"}
+      onNavigate={(href) => {
+        setActiveTab(href === "#processing" ? "processing" : "dashboard");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }}
+      accountName="Laboratory technician"
+      accountRole="Processing & inventory"
+    >
+          <div className="mx-auto max-w-7xl">
 
-        <header className="flex shrink-0 flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div style={{ backgroundColor: PRIMARY_RED }} className="flex h-10 w-10 items-center justify-center rounded-xl text-white">
-              <FlaskConical size={19} />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-slate-950">BloodBridge</p>
-              <p className="text-[10px] text-slate-400">Laboratory workspace</p>
-            </div>
-          </div>
+            <PageHeader
+              eyebrow={activeTab === "dashboard" ? "Laboratory dashboard" : "Donation processing"}
+              title={activeTab === "dashboard" ? "Overview" : "Processing workspace"}
+              description={
+                activeTab === "dashboard"
+                  ? "Track processing performance and inventory health at a glance."
+                  : "Record completed donations and keep verified inventory available to the care team."
+              }
+              actions={
+                <>
+                  <div className="flex rounded-xl border border-slate-300 p-0.5">
+                    <TabButton
+                      label="Dashboard"
+                      active={activeTab === "dashboard"}
+                      onClick={() => setActiveTab("dashboard")}
+                    />
+                    <TabButton
+                      label="Processing"
+                      active={activeTab === "processing"}
+                      onClick={() => setActiveTab("processing")}
+                    />
+                  </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="text-xs font-bold text-slate-800">Laboratory technician</p>
-              <p className="mt-0.5 text-[10px] text-slate-400">Processing &amp; inventory</p>
-            </div>
-            <div style={{ backgroundColor: PRIMARY_RED }} className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white">
-              LT
-            </div>
-          </div>
-        </header>
+                  <button
+                    onClick={loadAll}
+                    className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-300 px-5 text-[13px] font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                  >
+                    <RefreshCw size={15} />
+                    Refresh
+                  </button>
+                </>
+              }
+            />
 
-        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-
-          <aside className="w-full shrink-0 overflow-y-auto border-r border-slate-200 bg-white p-4 lg:w-[230px]">
-            <nav className="space-y-2">
-              <NavButton
-                label="Dashboard"
-                icon={<LayoutDashboard size={18} />}
-                active={activeTab === "dashboard"}
-                onClick={() => setActiveTab("dashboard")}
-              />
-              <NavButton
-                label="Processing"
-                icon={<FlaskConical size={18} />}
-                active={activeTab === "processing"}
-                onClick={() => setActiveTab("processing")}
-              />
-              <NavItem href="/portal/lab-technician/ai-recommendations" label="AI recommendations" icon={<Sparkles size={18} />} />
-            </nav>
-
-            <div className="mt-8 border-t border-slate-100 pt-5">
-              <p className="px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Account</p>
-              <div className="mt-3 space-y-2">
-                <Link href="/api/logout" className="flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-red-700 transition hover:bg-red-50">
-                  <LogoutIcon />
-                  Sign out
-                </Link>
-              </div>
-            </div>
-          </aside>
-
-          <section className="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 p-6 lg:p-8">
-
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-red-950">
-                  <Activity size={13} strokeWidth={2.5} />
-                  {activeTab === "dashboard" ? "Laboratory dashboard" : "Donation processing"}
-                </p>
-                <h1 className="mt-2 text-3xl font-bold text-slate-950">
-                  {activeTab === "dashboard" ? "Overview" : "Processing workspace"}
-                </h1>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                  {activeTab === "dashboard"
-                    ? "Track processing performance and inventory health at a glance."
-                    : "Record completed donations and keep verified inventory available to the care team."}
-                </p>
-              </div>
-
-              <button onClick={loadAll} className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
-                <RefreshCw size={15} />
-                Refresh
-              </button>
-            </div>
-
-            {error && <p className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
-            {notice && <p className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700">{notice}</p>}
+            {error && <p className="mt-6 rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</p>}
+            {notice && <p className="mt-6 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</p>}
 
             {activeTab === "dashboard" ? (
               <>
-                <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <KpiCard label="Pending donations" value={unrecordedAppointments.length.toString()} delta="Awaiting record" trend="flat" icon={<FlaskConical size={18} />} />
-                  <KpiCard label="Total inventory" value={totalUnits.toString()} delta="Units in stock" trend="flat" icon={<Droplet size={18} />} />
-                  <KpiCard label="Recorded donations" value={donations.length.toString()} delta="Most recent 100" trend="flat" icon={<Activity size={18} />} />
-                  <KpiCard
-                    label="Low stock groups"
-                    value={lowStockGroups.toString()}
-                    delta={lowStockGroups > 0 ? `Below ${LOW_STOCK_THRESHOLD} units` : "All groups healthy"}
-                    trend={lowStockGroups > 0 ? "down" : "up"}
-                    icon={<AlertTriangle size={18} />}
-                  />
+                <div className="mt-7">
+                  <StatGrid>
+                    <Stat
+                      label="Pending donations"
+                      value={unrecordedAppointments.length.toString()}
+                      foot="Awaiting record"
+                      tone={unrecordedAppointments.length > 0 ? "warn" : "default"}
+                    />
+                    <Stat
+                      label="Total inventory"
+                      value={totalUnits.toString()}
+                      foot="Units in stock"
+                    />
+                    <Stat
+                      label="Recorded donations"
+                      value={donations.length.toString()}
+                      foot="Most recent 100"
+                    />
+                    <Stat
+                      label="Low stock groups"
+                      value={lowStockGroups.toString()}
+                      foot={
+                        lowStockGroups > 0
+                          ? `Below ${LOW_STOCK_THRESHOLD} units`
+                          : "All groups healthy"
+                      }
+                      tone={lowStockGroups > 0 ? "critical" : "good"}
+                    />
+                  </StatGrid>
                 </div>
 
                 <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_340px]">
@@ -432,31 +463,40 @@ export default function LabTechnicianPortalPage() {
                   }
                 >
                   <div className="flex items-start gap-4">
-                    <div style={{ backgroundColor: PRIMARY_RED }} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white">
-                      <Sparkles size={18} />
+                    <div
+                      aria-hidden
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-950 text-white"
+                    >
+                      <Sparkles size={17} />
                     </div>
 
                     <div className="min-w-0">
                       {topRecommendation ? (
                         <>
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-bold text-slate-900">
+                            <RowTitle>
                               {bloodGroupLabels[topRecommendation.bloodGroup]} needs attention
-                            </p>
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${priorityStyles[topRecommendation.priority]}`}>
+                            </RowTitle>
+                            <Pill tone={priorityTones[topRecommendation.priority]}>
                               {topRecommendation.priority}
-                            </span>
+                            </Pill>
                           </div>
-                          <p className="mt-1 text-xs leading-5 text-slate-500">{topRecommendation.message}</p>
+                          <p className="mt-1.5 text-xs leading-5 text-slate-600">
+                            {topRecommendation.message}
+                          </p>
                         </>
                       ) : (
-                        <p className="text-xs leading-5 text-slate-500">
-                          {loading ? "Analysing your inventory..." : "Stock levels look healthy across all blood groups."}
+                        <p className="text-xs leading-5 text-slate-600">
+                          {loading
+                            ? "Analysing your inventory…"
+                            : "Stock levels look healthy across all blood groups."}
                         </p>
                       )}
 
                       {aiSummary && (
-                        <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">{aiSummary}</p>
+                        <p className="mt-3 rounded-xl border border-slate-200 p-3 text-xs leading-5 text-slate-600">
+                          {aiSummary}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -464,68 +504,95 @@ export default function LabTechnicianPortalPage() {
               </>
             ) : (
               <>
-                <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <h2 className="text-lg font-bold text-slate-950">Blood inventory</h2>
-                  {loading ? (
-                    <p className="mt-6 text-sm text-slate-500">Loading inventory...</p>
-                  ) : (
-                    <div className="mt-5 grid gap-3 sm:grid-cols-4">
-                      {inventory.map((row) => (
-                        <div key={row.bloodGroup} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                          <p className="text-xs font-black uppercase tracking-[0.16em] text-red-700">{bloodGroupLabels[row.bloodGroup]}</p>
-                          <p className="mt-2 text-2xl font-black text-slate-950">{row.units}</p>
-                          <p className="text-xs text-slate-500">units</p>
-                          <div className="mt-3 flex gap-2">
-                            <button
-                              onClick={() => adjustInventory(row.bloodGroup, -1)}
-                              disabled={actionId === row.bloodGroup || row.units === 0}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 disabled:opacity-40"
-                            >
-                              <Minus size={14} />
-                            </button>
-                            <button
-                              onClick={() => adjustInventory(row.bloodGroup, 1)}
-                              disabled={actionId === row.bloodGroup}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 disabled:opacity-40"
-                            >
-                              <Plus size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-
-                <div className="mt-6 grid gap-6 lg:grid-cols-2">
-                  <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-bold text-slate-950">Donations to record</h2>
+                <div className="mt-7">
+                  <Panel label="Blood inventory">
                     {loading ? (
-                      <p className="mt-6 text-sm text-slate-500">Loading appointments...</p>
-                    ) : unrecordedAppointments.length === 0 ? (
-                      <p className="mt-6 rounded-xl bg-slate-50 p-6 text-sm text-slate-500">No completed appointments awaiting a record.</p>
+                      <p className="mt-5 text-sm text-slate-500">Loading inventory…</p>
                     ) : (
-                      <div className="mt-5 divide-y divide-slate-100">
-                        {unrecordedAppointments.map((appointment) => (
-                          <div key={appointment.id} className="py-4">
+                      <div className="mt-5 grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-2 lg:grid-cols-4">
+                        {inventory.map((row) => (
+                          <div key={row.bloodGroup} className="bg-white px-5 py-5">
+                            <Eyebrow>{bloodGroupLabels[row.bloodGroup]}</Eyebrow>
+
+                            <p
+                              className={`mt-3 text-[26px] font-bold leading-none tracking-[-0.02em] tabular-nums ${
+                                row.units < LOW_STOCK_THRESHOLD ? "text-red-800" : "text-slate-950"
+                              }`}
+                            >
+                              {row.units}
+                            </p>
+
+                            <p className="mt-2.5 text-xs text-slate-500">
+                              units{row.units < LOW_STOCK_THRESHOLD ? " · low stock" : ""}
+                            </p>
+
+                            <div className="mt-4 flex gap-2">
+                              <button
+                                onClick={() => adjustInventory(row.bloodGroup, -1)}
+                                disabled={actionId === row.bloodGroup || row.units === 0}
+                                aria-label={`Remove one ${bloodGroupLabels[row.bloodGroup]} unit`}
+                                className={stepperClass}
+                              >
+                                <Minus size={14} />
+                              </button>
+                              <button
+                                onClick={() => adjustInventory(row.bloodGroup, 1)}
+                                disabled={actionId === row.bloodGroup}
+                                aria-label={`Add one ${bloodGroupLabels[row.bloodGroup]} unit`}
+                                className={stepperClass}
+                              >
+                                <Plus size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </Panel>
+                </div>
+
+                <div id="processing" className="mt-6 grid gap-6 lg:grid-cols-2">
+                  <Panel label="Donations to record" padded={false}>
+                    <div className="mt-5 border-t border-slate-100">
+                      {loading ? (
+                        <p className="px-6 py-8 text-sm text-slate-500">Loading appointments…</p>
+                      ) : unrecordedAppointments.length === 0 ? (
+                        <div className="p-6">
+                          <EmptyState
+                            title="Nothing awaiting a record"
+                            description="Completed appointments without a donation record appear here."
+                          />
+                        </div>
+                      ) : (
+                        unrecordedAppointments.map((appointment) => (
+                          <div
+                            key={appointment.id}
+                            className="border-b border-slate-100 px-6 py-4 last:border-b-0"
+                          >
                             <div className="flex flex-wrap items-center justify-between gap-4">
-                              <div>
-                                <p className="font-semibold text-slate-900">
-                                  {appointment.donor.firstName} {appointment.donor.lastName}
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <RowTitle>
+                                    {appointment.donor.firstName} {appointment.donor.lastName}
+                                  </RowTitle>
+
                                   {appointment.donor.donorProfile?.bloodGroup && (
-                                    <span className="ml-2 text-sm text-slate-500">
+                                    <Pill tone="critical">
                                       {bloodGroupLabels[appointment.donor.donorProfile.bloodGroup]}
-                                    </span>
+                                    </Pill>
                                   )}
-                                </p>
-                                <p className="mt-1 text-sm text-slate-500">
-                                  {formatDate(appointment.appointmentDate)} at {appointment.appointmentTime}
-                                </p>
+                                </div>
+
+                                <RowMeta>
+                                  {formatDate(appointment.appointmentDate)} at{" "}
+                                  {appointment.appointmentTime}
+                                </RowMeta>
                               </div>
+
                               {recordingId !== appointment.id && (
                                 <button
                                   onClick={() => startRecording(appointment.id)}
-                                  className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+                                  className="inline-flex h-9 shrink-0 items-center rounded-lg bg-red-950 px-4 text-xs font-semibold text-white transition hover:brightness-125"
                                 >
                                   Record donation
                                 </button>
@@ -533,40 +600,65 @@ export default function LabTechnicianPortalPage() {
                             </div>
 
                             {recordingId === appointment.id && (
-                              <form onSubmit={submitRecord} className="mt-4 space-y-3 rounded-xl bg-slate-50 p-4">
+                              <form
+                                onSubmit={submitRecord}
+                                className="mt-4 space-y-3 rounded-xl border border-slate-200 p-4"
+                              >
+                                <label htmlFor="rec-volume" className="sr-only">
+                                  Volume in millilitres
+                                </label>
                                 <input
+                                  id="rec-volume"
                                   required
                                   type="number"
                                   min={1}
                                   value={recordForm.volumeMl}
-                                  onChange={(event) => setRecordForm({ ...recordForm, volumeMl: event.target.value })}
+                                  onChange={(event) =>
+                                    setRecordForm({ ...recordForm, volumeMl: event.target.value })
+                                  }
                                   placeholder="Volume (mL)"
-                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                                  className={fieldClass}
                                 />
+
+                                <label htmlFor="rec-pack" className="sr-only">
+                                  Blood pack ID
+                                </label>
                                 <input
+                                  id="rec-pack"
                                   value={recordForm.bloodPackId}
-                                  onChange={(event) => setRecordForm({ ...recordForm, bloodPackId: event.target.value })}
+                                  onChange={(event) =>
+                                    setRecordForm({ ...recordForm, bloodPackId: event.target.value })
+                                  }
                                   placeholder="Blood pack ID (optional)"
-                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                                  className={fieldClass}
                                 />
+
+                                <label htmlFor="rec-notes" className="sr-only">
+                                  Notes
+                                </label>
                                 <textarea
+                                  id="rec-notes"
                                   value={recordForm.notes}
-                                  onChange={(event) => setRecordForm({ ...recordForm, notes: event.target.value })}
+                                  onChange={(event) =>
+                                    setRecordForm({ ...recordForm, notes: event.target.value })
+                                  }
                                   placeholder="Notes (optional)"
                                   rows={2}
-                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-[13.5px] transition focus:border-slate-500 focus:outline-none"
                                 />
+
                                 <div className="flex gap-2">
                                   <button
                                     disabled={submittingRecord}
-                                    className="rounded-lg bg-red-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-900 disabled:opacity-50"
+                                    className="inline-flex h-10 items-center rounded-lg bg-red-950 px-4 text-xs font-semibold text-white transition hover:brightness-125 disabled:opacity-50"
                                   >
-                                    {submittingRecord ? "Saving..." : "Save record"}
+                                    {submittingRecord ? "Saving…" : "Save record"}
                                   </button>
+
                                   <button
                                     type="button"
                                     onClick={() => setRecordingId(null)}
-                                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                                    className="inline-flex h-10 items-center rounded-lg border border-slate-300 px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                                   >
                                     Cancel
                                   </button>
@@ -574,90 +666,69 @@ export default function LabTechnicianPortalPage() {
                               </form>
                             )}
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
+                        ))
+                      )}
+                    </div>
+                  </Panel>
 
-                  <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-bold text-slate-950">Recent donations</h2>
-                    {loading ? (
-                      <p className="mt-6 text-sm text-slate-500">Loading donations...</p>
-                    ) : donations.length === 0 ? (
-                      <p className="mt-6 rounded-xl bg-slate-50 p-6 text-sm text-slate-500">No donations recorded yet.</p>
-                    ) : (
-                      <div className="mt-5 divide-y divide-slate-100">
-                        {donations.map((donation) => (
-                          <div key={donation.id} className="py-4">
-                            <p className="font-semibold text-slate-900">
-                              {donation.donor.firstName} {donation.donor.lastName}
-                              <span className="ml-2 text-sm text-slate-500">{bloodGroupLabels[donation.bloodGroup]}</span>
-                            </p>
-                            <p className="mt-1 text-sm text-slate-500">
-                              {formatDate(donation.donatedAt)} · {donation.volumeMl}mL
-                              {donation.bloodPackId ? ` · Pack ${donation.bloodPackId}` : ""}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
+                  <Panel label="Recent donations" padded={false}>
+                    <div className="mt-5 border-t border-slate-100">
+                      {loading ? (
+                        <p className="px-6 py-8 text-sm text-slate-500">Loading donations…</p>
+                      ) : donations.length === 0 ? (
+                        <div className="p-6">
+                          <EmptyState
+                            title="No donations recorded yet"
+                            description="Records you save appear here, newest first."
+                          />
+                        </div>
+                      ) : (
+                        donations.map((donation) => (
+                          <Row key={donation.id}>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <RowTitle>
+                                  {donation.donor.firstName} {donation.donor.lastName}
+                                </RowTitle>
+                                <Pill tone="critical">{bloodGroupLabels[donation.bloodGroup]}</Pill>
+                              </div>
+
+                              <RowMeta>
+                                {formatDate(donation.donatedAt)} · {donation.volumeMl} mL
+                                {donation.bloodPackId ? ` · Pack ${donation.bloodPackId}` : ""}
+                              </RowMeta>
+                            </div>
+                          </Row>
+                        ))
+                      )}
+                    </div>
+                  </Panel>
                 </div>
               </>
             )}
-          </section>
-        </div>
-      </section>
-    </main>
+          </div>
+    </PortalShell>
   );
 }
 
-function NavItem({
-  href,
+function TabButton({
   label,
-  icon,
-  active = false,
-}: {
-  href: string;
-  label: string;
-  icon: ReactNode;
-  active?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      style={active ? { backgroundColor: PRIMARY_RED } : undefined}
-      className={`flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${
-        active ? "text-white" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-      }`}
-    >
-      {icon}
-      {label}
-    </Link>
-  );
-}
-
-function NavButton({
-  label,
-  icon,
-  active = false,
+  active,
   onClick,
 }: {
   label: string;
-  icon: ReactNode;
-  active?: boolean;
+  active: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      style={active ? { backgroundColor: PRIMARY_RED } : undefined}
-      className={`flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold transition ${
-        active ? "text-white" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+      aria-pressed={active}
+      className={`rounded-lg px-4 text-[11px] font-semibold transition ${
+        active ? "bg-red-950 text-white" : "text-slate-600 hover:bg-slate-100"
       }`}
     >
-      {icon}
       {label}
     </button>
   );
