@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="690" style="color:#1a1315"
+        viewBox="0 0 1120 690"
+        role="img"
+        aria-label="Physical architecture: a mobile phone, desktop and laptop connect to an application server, which connects to a PostgreSQL database server, a Gmail SMTP email server, and a local Qwen model server."
+      >
+  <style>
+    text { font-family: "Source Sans 3", "Segoe UI", system-ui, sans-serif; fill: #1a1315; }
+    text.m { font-family: "JetBrains Mono", Consolas, ui-monospace, monospace; }
+    text.tier { font-size: 11px; letter-spacing: 0.14em; opacity: 0.6; }
+    text.a { fill: #a11733; }
+    .as { stroke: #a11733; }
+    marker#arrow-accent path, marker#t-arrow-accent path, marker#s-arrow-accent path { fill: #a11733; }
+  </style>
+  <rect width="100%" height="100%" fill="#ffffff" />
+        <defs>
+          <marker id="s-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+          </marker>
+          <marker id="s-arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" />
+          </marker>
+      
+          <!-- one rack, reused wherever a server stands -->
+          <g id="rack">
+            <rect x="0" y="0" width="86" height="118" rx="5" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <rect x="9" y="11" width="68" height="22" rx="3" fill="currentColor" opacity="0.08" />
+            <circle cx="68" cy="22" r="3.2" fill="currentColor" opacity="0.5" />
+            <rect x="9" y="39" width="68" height="22" rx="3" fill="currentColor" opacity="0.08" />
+            <circle cx="68" cy="50" r="3.2" fill="currentColor" opacity="0.5" />
+            <rect x="9" y="67" width="68" height="22" rx="3" fill="currentColor" opacity="0.08" />
+            <circle cx="68" cy="78" r="3.2" fill="currentColor" opacity="0.5" />
+            <rect x="9" y="95" width="42" height="12" rx="2" fill="currentColor" opacity="0.18" />
+          </g>
+        </defs>
+      
+        <!-- ================= CLIENT DEVICES ================= -->
+        <text x="28" y="34" class="m tier">PRESENTATION — CLIENT DEVICES</text>
+        <line x1="28" y1="46" x2="250" y2="46" stroke="currentColor" stroke-width="1" opacity="0.25" />
+      
+        <!-- phone -->
+        <g transform="translate(74,72)">
+          <rect x="0" y="0" width="54" height="96" rx="9" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <rect x="6" y="12" width="42" height="70" rx="2" fill="currentColor" opacity="0.08" />
+          <rect x="19" y="5" width="16" height="3" rx="1.5" fill="currentColor" opacity="0.4" />
+          <circle cx="27" cy="88" r="2.6" fill="currentColor" opacity="0.4" />
+          <line x1="13" y1="26" x2="35" y2="26" stroke="currentColor" stroke-width="2.4" opacity="0.45" />
+          <line x1="13" y1="36" x2="41" y2="36" stroke="currentColor" stroke-width="2.4" opacity="0.22" />
+          <line x1="13" y1="46" x2="31" y2="46" stroke="currentColor" stroke-width="2.4" opacity="0.22" />
+        </g>
+        <text x="101" y="190" text-anchor="middle" font-size="12.5" font-weight="600">Mobile phone</text>
+      
+        <!-- desktop -->
+        <g transform="translate(46,246)">
+          <rect x="0" y="0" width="98" height="66" rx="4" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <rect x="7" y="7" width="84" height="46" rx="2" fill="currentColor" opacity="0.08" />
+          <rect x="40" y="66" width="18" height="12" fill="currentColor" opacity="0.35" />
+          <rect x="26" y="78" width="46" height="5" rx="2.5" fill="currentColor" opacity="0.35" />
+          <rect x="110" y="8" width="26" height="70" rx="3" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <circle cx="123" cy="20" r="3" fill="currentColor" opacity="0.45" />
+          <line x1="116" y1="32" x2="130" y2="32" stroke="currentColor" stroke-width="1.4" opacity="0.3" />
+          <line x1="116" y1="40" x2="130" y2="40" stroke="currentColor" stroke-width="1.4" opacity="0.3" />
+        </g>
+        <text x="101" y="352" text-anchor="middle" font-size="12.5" font-weight="600">Desktop</text>
+      
+        <!-- laptop -->
+        <g transform="translate(44,408)">
+          <rect x="12" y="0" width="100" height="64" rx="4" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <rect x="19" y="7" width="86" height="45" rx="2" fill="currentColor" opacity="0.08" />
+          <path d="M0 70 H124 L114 64 H10 Z" fill="currentColor" opacity="0.3" />
+          <path d="M0 70 H124 L114 64 H10 Z" fill="none" stroke="currentColor" stroke-width="1.5" />
+        </g>
+        <text x="106" y="504" text-anchor="middle" font-size="12.5" font-weight="600">Laptop</text>
+      
+        <!-- the client bus -->
+        <line x1="101" y1="120" x2="222" y2="120" stroke="currentColor" stroke-width="1.5" />
+        <line x1="182" y1="285" x2="222" y2="285" stroke="currentColor" stroke-width="1.5" />
+        <line x1="106" y1="443" x2="222" y2="443" stroke="currentColor" stroke-width="1.5" />
+        <line x1="222" y1="120" x2="222" y2="443" stroke="currentColor" stroke-width="1.5" />
+        <line x1="222" y1="285" x2="411" y2="285" stroke="currentColor" stroke-width="1.5" marker-end="url(#s-arrow)" />
+      
+        <!-- ================= APPLICATION SERVER ================= -->
+        <text x="500" y="34" class="m tier">APPLICATION SERVER</text>
+        <line x1="390" y1="46" x2="700" y2="46" stroke="currentColor" stroke-width="1" opacity="0.25" />
+      
+        <g transform="translate(414,206)">
+          <use href="#rack" />
+          <!-- the globe that says this one serves the web -->
+          <circle cx="106" cy="82" r="30" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <ellipse cx="106" cy="82" rx="13" ry="30" fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.6" />
+          <line x1="76" y1="82" x2="136" y2="82" stroke="currentColor" stroke-width="1.3" opacity="0.6" />
+          <path d="M82 66 h48" fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.45" />
+          <path d="M82 98 h48" fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.45" />
+        </g>
+      
+        <text x="482" y="368" text-anchor="middle" font-size="13.5" font-weight="600">Application server</text>
+      
+        <!-- ================= DATABASE SERVER ================= -->
+        <text x="890" y="34" class="m tier">DATABASE SERVER</text>
+        <line x1="820" y1="46" x2="1092" y2="46" stroke="currentColor" stroke-width="1" opacity="0.25" />
+      
+        <line x1="502" y1="252" x2="857" y2="252" stroke="currentColor" stroke-width="1.5" marker-end="url(#s-arrow)" />
+      
+        <g transform="translate(860,150)">
+          <use href="#rack" />
+          <g transform="translate(74,26)">
+            <ellipse cx="46" cy="14" rx="44" ry="13" fill="currentColor" opacity="0.08" />
+            <ellipse cx="46" cy="14" rx="44" ry="13" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M2 14 v22 a44 13 0 0 0 88 0 v-22" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <ellipse cx="46" cy="36" rx="44" ry="13" fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.5" />
+            <path d="M2 36 v22 a44 13 0 0 0 88 0 v-22" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <ellipse cx="46" cy="58" rx="44" ry="13" fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.5" />
+            <path d="M2 58 v22 a44 13 0 0 0 88 0 v-22" fill="none" stroke="currentColor" stroke-width="1.8" />
+          </g>
+        </g>
+      
+        <text x="950" y="300" text-anchor="middle" font-size="13.5" font-weight="600">Database server</text>
+      
+        <!-- ================= THE TWO SERVICES BELOW ================= -->
+        <path d="M430 328 L363 458" fill="none" stroke="currentColor" stroke-width="1.5" marker-end="url(#s-arrow)" />
+        <path d="M534 328 L703 458" fill="none" stroke="currentColor" stroke-width="1.5" marker-end="url(#s-arrow)" />
+      
+        <!-- email server -->
+        <g transform="translate(320,462)">
+          <use href="#rack" />
+        </g>
+        <text x="363" y="602" text-anchor="middle" font-size="13" font-weight="600">Email server</text>
+      
+        <!-- qwen model server -->
+        <g transform="translate(660,462)">
+          <use href="#rack" />
+        </g>
+        <text x="703" y="602" text-anchor="middle" font-size="13" font-weight="600">Qwen model server</text>
+      
+      <!-- the two services, grouped -->
+  <path d="M363 618 V640 H703 V618" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.55" />
+  <text x="533" y="662" text-anchor="middle" font-size="13" font-weight="600">APIs</text>
+</svg>

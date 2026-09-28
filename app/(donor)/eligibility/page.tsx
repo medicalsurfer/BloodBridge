@@ -327,7 +327,7 @@ export default function EligibilityPage() {
               Important
             </p>
             <p className="mt-3 text-sm font-bold">This is a preliminary check.</p>
-            <p className="mt-2 text-xs leading-5 text-red-100/85">
+            <p className="mt-2 text-xs leading-5 on-garnet">
               Final eligibility must be confirmed by qualified healthcare staff before blood
               donation.
             </p>

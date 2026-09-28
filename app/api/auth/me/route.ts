@@ -118,6 +118,7 @@ export async function GET(request: NextRequest) {
 
       include: {
         donorProfile: true,
+        healthInstitute: { select: { name: true, city: true } },
 
         appointments: {
           where: {
@@ -175,6 +176,41 @@ export async function GET(request: NextRequest) {
         ? await prisma.donation.count({ where: { donorId: user.id } })
         : 0;
 
+    /*
+      The snapshot beside the assistant, for staff.
+
+      It used to be donor-only, so a lab technician who opened the assistant
+      got an empty column where a donor sees their own figures. These are the
+      two a technician acts on — what is short, and what is waiting to be
+      recorded — and they are only queried for the role that uses them.
+    */
+    const labSnapshot =
+      user.role === "LAB_TECHNICIAN" && user.healthInstituteId
+        ? await (async () => {
+            const [lowest, awaitingRecord] = await Promise.all([
+              prisma.bloodInventory.findFirst({
+                where: { healthInstituteId: user.healthInstituteId! },
+                orderBy: { units: "asc" },
+                select: { bloodGroup: true, units: true },
+              }),
+              prisma.appointment.count({
+                where: {
+                  healthInstituteId: user.healthInstituteId!,
+                  status: "COMPLETED",
+                  donation: { is: null },
+                },
+              }),
+            ]);
+
+            return {
+              lowestStock: lowest
+                ? { bloodGroup: formatBloodGroup(lowest.bloodGroup), units: lowest.units }
+                : null,
+              awaitingRecord,
+            };
+          })()
+        : null;
+
     const donorProfile =
   user.role === "DONOR"
     ? user.donorProfile
@@ -196,6 +232,13 @@ const upcomingAppointment =
       phoneNumber: user.phoneNumber,
       role: user.role,
        isActive: user.isActive,
+
+      // Staff and admins: who they work for, and what their own screen needs.
+      institute: user.healthInstitute
+        ? { name: user.healthInstitute.name, city: user.healthInstitute.city }
+        : null,
+
+      labSnapshot,
 
      bloodGroup:
         user.role === "DONOR"

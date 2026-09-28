@@ -23,6 +23,31 @@ const eslintConfig = defineConfig([
     files: ["tests/**/*.ts"],
     rules: {
       "@typescript-eslint/no-require-imports": "off",
+
+      /*
+        `jest`, `describe`, `it` and `expect` are globals supplied by
+        @types/jest. Importing the name `jest` rebinds it - `next/jest` in
+        particular exports the config factory - and every jest.mock/fn/spyOn
+        in the file then fails to type-check. It looks like a fix for a red
+        squiggle and is the opposite of one, so it is an error here.
+      */
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "next/jest",
+              message:
+                "next/jest belongs in jest.config.ts only. In a test, `jest` is a global from @types/jest - do not import it. If the globals show as undefined, restart the TypeScript server rather than adding an import.",
+            },
+            {
+              name: "jest",
+              message:
+                "`jest` is a global from @types/jest - do not import it. If you want explicit imports instead, use `import { jest, describe, it, expect } from \"@jest/globals\"` consistently across the file.",
+            },
+          ],
+        },
+      ],
     },
   },
   {

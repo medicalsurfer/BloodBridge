@@ -66,7 +66,7 @@ export default function ForgotPasswordPage() {
 
             <div>
               <p className="text-base font-semibold">BloodBridge</p>
-              <p className="text-[10px] text-red-100/70">Intelligent Blood Donation Platform</p>
+              <p className="text-[10px] on-garnet-dim">Intelligent Blood Donation Platform</p>
             </div>
           </div>
         </div>

@@ -8,6 +8,14 @@
 */
 
 const BASE_URL = (process.env.AI_BASE_URL ?? "http://127.0.0.1:8080/v1").replace(/\/$/, "");
+
+/*
+  Whether a model is deployed at all. In development the local default is
+  assumed (`npm run ai`). In production — Vercel, say — there is no model on
+  127.0.0.1, so without AI_BASE_URL the model is skipped outright rather than
+  tried and failed on every message; the system's own answers still work.
+*/
+export const aiEnabled = Boolean(process.env.AI_BASE_URL) || process.env.NODE_ENV !== "production";
 const MODEL = process.env.AI_MODEL ?? "bloodbridge-assistant";
 const API_KEY = process.env.AI_API_KEY;
 
@@ -76,6 +84,8 @@ export async function* streamChat(messages: AiMessage[], options: Options = {}):
 
 /** Returns the full reply, or null if the provider is unavailable. Never throws. */
 export async function completeChat(messages: AiMessage[], options: Options = {}): Promise<string | null> {
+  if (!aiEnabled) return null;
+
   try {
     const response = await request(messages, false, options);
     await ensureOk(response);

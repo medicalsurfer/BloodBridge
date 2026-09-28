@@ -35,8 +35,23 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   // A chosen theme is rendered here so it survives hydration; no choice means
   // the stylesheet follows the visitor's system preference.
-  const chosenTheme = (await cookies()).get("bb-theme")?.value;
+  const cookieStore = await cookies();
+  const chosenTheme = cookieStore.get("bb-theme")?.value;
   const theme = chosenTheme === "dark" || chosenTheme === "light" ? chosenTheme : undefined;
+
+  /*
+    The assistant is for signed-in people, so it is not rendered at all when
+    there is no session cookie. It used to mount everywhere and ask
+    /api/auth/me who the visitor was — which on the landing, login, register,
+    privacy and terms pages is a request that can only come back 401, and the
+    browser logs every one of those in the console.
+
+    The cookie is only checked for existence here, not verified: an expired one
+    still mounts the widget, which then hides itself after its own check. That
+    keeps this free — no token verification and no database read on a page
+    nobody has signed in to.
+  */
+  const hasSession = cookieStore.has("bloodbridge_session");
 
   return (
     <html
@@ -58,7 +73,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </Script>
 
         {children}
-        <AssistantWidget />
+        {hasSession && <AssistantWidget />}
       </body>
     </html>
   );

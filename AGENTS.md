@@ -1,3 +1,13 @@
+# Tests
+
+`npm test` runs the Jest suite. In a test file `jest`, `describe`, `it` and
+`expect` are globals from @types/jest — never import them, and never import
+`next/jest` outside `jest.config.ts`. If they appear undefined in an editor,
+the TypeScript server is stale; restart it instead of adding an import.
+
+Before changing a test to make an error go away, run `npm test` and read the
+failure: the suite is what says whether the platform still works.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

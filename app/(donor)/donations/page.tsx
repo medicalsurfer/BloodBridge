@@ -325,7 +325,7 @@ export default function DonationHistoryPage() {
 
               <p className="mt-3 text-sm font-bold">Ready to donate again?</p>
 
-              <p className="mt-2 text-xs leading-5 text-red-100/85">
+              <p className="mt-2 text-xs leading-5 on-garnet">
                 Complete your eligibility check before scheduling your next donation appointment.
               </p>
 

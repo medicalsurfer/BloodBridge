@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/src/lib/prisma";
 import { getAuthenticatedLabTechnician } from "@/src/lib/auth";
-import {
-  buildRuleBasedRecommendations,
-  generateAiSummary,
-  type BloodGroup,
-} from "@/src/lib/ai-recommendations";
+import { generateAiSummary } from "@/src/lib/ai-recommendations";
+import { label } from "@/src/lib/donor-matching";
+import { gatherLabInsights } from "@/src/lib/lab-insights";
+import { groupsNeedingAction } from "@/src/lib/shortage-forecast";
 
+/*
+  The laboratory's decision-support payload, for anything that wants it over
+  HTTP. The screen itself renders the same data on the server (see
+  app/portal/lab-technician/ai-recommendations/page.tsx); both go through
+  gatherLabInsights, so there is one set of queries and one set of rules.
+*/
 export async function GET(request: NextRequest) {
   const authentication = await getAuthenticatedLabTechnician(request);
 
@@ -17,54 +21,27 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const healthInstituteId = authentication.user.healthInstituteId;
-
-  const [institute, inventory, openRequests, recentDonations] = await Promise.all([
-    prisma.healthInstitute.findUnique({
-      where: { id: healthInstituteId },
-      select: { name: true },
-    }),
-    prisma.bloodInventory.findMany({
-      where: { healthInstituteId },
-      select: { bloodGroup: true, units: true },
-    }),
-    prisma.bloodRequest.findMany({
-      where: { healthInstituteId, status: "OPEN" },
-      select: { bloodGroup: true, unitsNeeded: true },
-    }),
-    prisma.donation.findMany({
-      where: {
-        healthInstituteId,
-        donatedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-      },
-      select: { bloodGroup: true },
-    }),
-  ]);
-
-  const openDemandByGroup: Partial<Record<BloodGroup, number>> = {};
-
-  for (const request of openRequests) {
-    const key = request.bloodGroup as BloodGroup;
-    openDemandByGroup[key] = (openDemandByGroup[key] ?? 0) + request.unitsNeeded;
-  }
-
-  const recentDonationsByGroup: Partial<Record<BloodGroup, number>> = {};
-
-  for (const donation of recentDonations) {
-    const key = donation.bloodGroup as BloodGroup;
-    recentDonationsByGroup[key] = (recentDonationsByGroup[key] ?? 0) + 1;
-  }
-
-  const recommendations = buildRuleBasedRecommendations({
-    inventory: inventory.map((row) => ({ bloodGroup: row.bloodGroup as BloodGroup, units: row.units })),
-    openDemandByGroup,
-    recentDonationsByGroup,
+  const insights = await gatherLabInsights({
+    healthInstituteId: authentication.user.healthInstituteId,
+    matchFor: request.nextUrl.searchParams.get("matchFor"),
   });
 
-  const aiSummary = await generateAiSummary(recommendations, institute?.name ?? "your institute");
+  // The model is given the sentences the forecast already produced, so it is
+  // rephrasing arithmetic rather than being asked to predict anything.
+  const aiSummary = await generateAiSummary(
+    insights.recommendations,
+    insights.instituteName ?? "your institute",
+    groupsNeedingAction(insights.forecast).map(
+      (group) => `${label(group.bloodGroup)}: ${group.message}`,
+    ),
+  );
 
   return NextResponse.json(
-    { recommendations, aiSummary, aiConfigured: Boolean(process.env.AI_API_KEY) },
+    {
+      ...insights,
+      aiSummary,
+      aiConfigured: Boolean(process.env.AI_API_KEY || process.env.AI_BASE_URL),
+    },
     { status: 200, headers: { "Cache-Control": "private, no-store" } },
   );
 }

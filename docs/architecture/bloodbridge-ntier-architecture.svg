@@ -1,0 +1,195 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" style="color:#1a1315"
+        viewBox="0 0 1200 760"
+        role="img"
+        aria-label="N-tier architecture of BloodBridge: staff workstations and donor phones reach a browser UI, which calls forty API route handlers grouped into eight services, which read a PostgreSQL database and a local language model server, and send mail through Gmail SMTP."
+      >
+  <style>
+    text { font-family: "Source Sans 3", "Segoe UI", system-ui, sans-serif; fill: #1a1315; }
+    text.m { font-family: "JetBrains Mono", Consolas, ui-monospace, monospace; }
+    text.tier { font-size: 11px; letter-spacing: 0.14em; opacity: 0.6; }
+    text.a { fill: #a11733; }
+    .as { stroke: #a11733; }
+    marker#arrow-accent path, marker#t-arrow-accent path, marker#s-arrow-accent path { fill: #a11733; }
+  </style>
+  <rect width="100%" height="100%" fill="#ffffff" />
+        <defs>
+          <marker id="t-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+          </marker>
+          <marker id="t-arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" />
+          </marker>
+        </defs>
+      
+        <!-- ============ TIER LABELS ============ -->
+        <text x="30" y="40" class="m tier">CLIENT DEVICES</text>
+        <text x="264" y="40" class="m tier">PRESENTATION</text>
+        <text x="484" y="40" class="m tier">APPLICATION — LOGIC</text>
+        <text x="934" y="40" class="m tier">DATA &amp; SERVICES</text>
+      
+        <line x1="30" y1="52" x2="210" y2="52" stroke="currentColor" stroke-width="1" opacity="0.25" />
+        <line x1="264" y1="52" x2="434" y2="52" stroke="currentColor" stroke-width="1" opacity="0.25" />
+        <line x1="484" y1="52" x2="884" y2="52" stroke="currentColor" stroke-width="1" opacity="0.25" />
+        <line x1="934" y1="52" x2="1170" y2="52" stroke="currentColor" stroke-width="1" opacity="0.25" />
+      
+        <!-- ============ CLIENT DEVICES ============ -->
+        <!-- staff workstation -->
+        <g transform="translate(44,96)">
+          <rect x="0" y="0" width="128" height="86" rx="5" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <rect x="9" y="9" width="110" height="60" rx="2" fill="currentColor" opacity="0.08" />
+          <line x1="20" y1="22" x2="74" y2="22" stroke="currentColor" stroke-width="2.5" opacity="0.45" />
+          <line x1="20" y1="34" x2="98" y2="34" stroke="currentColor" stroke-width="2.5" opacity="0.25" />
+          <line x1="20" y1="46" x2="86" y2="46" stroke="currentColor" stroke-width="2.5" opacity="0.25" />
+          <rect x="54" y="86" width="20" height="16" fill="currentColor" opacity="0.35" />
+          <rect x="36" y="102" width="56" height="6" rx="3" fill="currentColor" opacity="0.35" />
+        </g>
+        <text x="108" y="232" text-anchor="middle" font-size="13.5" font-weight="600">Staff workstation</text>
+        <text x="108" y="250" text-anchor="middle" class="m" font-size="10" opacity="0.7">medical staff · lab tech</text>
+        <text x="108" y="265" text-anchor="middle" class="m" font-size="10" opacity="0.7">institute &amp; system admin</text>
+      
+        <!-- donor phone -->
+        <g transform="translate(80,320)">
+          <rect x="0" y="0" width="56" height="98" rx="9" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <rect x="6" y="12" width="44" height="72" rx="2" fill="currentColor" opacity="0.08" />
+          <rect x="20" y="5" width="16" height="3" rx="1.5" fill="currentColor" opacity="0.4" />
+          <circle cx="28" cy="90" r="2.6" fill="currentColor" opacity="0.4" />
+          <line x1="13" y1="26" x2="37" y2="26" stroke="currentColor" stroke-width="2.5" opacity="0.45" />
+          <line x1="13" y1="36" x2="43" y2="36" stroke="currentColor" stroke-width="2.5" opacity="0.25" />
+          <line x1="13" y1="46" x2="33" y2="46" stroke="currentColor" stroke-width="2.5" opacity="0.25" />
+        </g>
+        <text x="108" y="444" text-anchor="middle" font-size="13.5" font-weight="600">Donor phone</text>
+        <text x="108" y="462" text-anchor="middle" class="m" font-size="10" opacity="0.7">mobile browser</text>
+      
+        <!-- clients to presentation -->
+        <path d="M180 140 H222 V250" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <path d="M148 370 H222 V290" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <line x1="222" y1="270" x2="258" y2="270" stroke="currentColor" stroke-width="1.5" marker-end="url(#t-arrow)" />
+        <text x="196" y="262" class="m" font-size="10" opacity="0.75">HTTPS</text>
+      
+        <!-- ============ PRESENTATION TIER ============ -->
+        <rect x="264" y="96" width="170" height="350" rx="7" fill="none" stroke="currentColor" stroke-width="1.8" />
+        <text x="349" y="126" text-anchor="middle" font-size="13.5" font-weight="600">Browser UI</text>
+      
+        <!-- a little app window -->
+        <g transform="translate(288,146)">
+          <rect x="0" y="0" width="122" height="150" rx="4" fill="none" stroke="currentColor" stroke-width="1.4" />
+          <line x1="0" y1="22" x2="122" y2="22" stroke="currentColor" stroke-width="1.4" />
+          <circle cx="12" cy="11" r="3" fill="currentColor" opacity="0.4" />
+          <circle cx="24" cy="11" r="3" fill="currentColor" opacity="0.25" />
+          <rect x="12" y="36" width="44" height="98" rx="2" fill="currentColor" opacity="0.08" />
+          <line x1="68" y1="44" x2="110" y2="44" stroke="currentColor" stroke-width="2.5" opacity="0.45" />
+          <line x1="68" y1="58" x2="110" y2="58" stroke="currentColor" stroke-width="2.5" opacity="0.22" />
+          <line x1="68" y1="72" x2="98" y2="72" stroke="currentColor" stroke-width="2.5" opacity="0.22" />
+          <rect x="68" y="92" width="42" height="18" rx="3" fill="currentColor" opacity="0.3" />
+        </g>
+      
+        <text x="349" y="326" text-anchor="middle" class="m" font-size="10" opacity="0.75">React pages, rendered by Next.js</text>
+        <text x="349" y="344" text-anchor="middle" class="m" font-size="10" opacity="0.75">donor pages · four staff portals</text>
+        <text x="349" y="368" text-anchor="middle" class="m" font-size="10" opacity="0.75">holds only the session cookie</text>
+        <text x="349" y="410" text-anchor="middle" class="m" font-size="10" opacity="0.6">no business rule lives here</text>
+      
+        <line x1="434" y1="270" x2="478" y2="270" stroke="currentColor" stroke-width="1.5" marker-end="url(#t-arrow)" />
+        <text x="440" y="262" class="m" font-size="10" opacity="0.75">JSON</text>
+      
+        <!-- ============ APPLICATION TIER ============ -->
+        <rect x="484" y="72" width="400" height="562" rx="7" fill="none" stroke="currentColor" stroke-width="2" />
+        <text x="504" y="100" font-size="13.5" font-weight="600">Next.js route handlers</text>
+        <text x="504" y="119" class="m" font-size="10" opacity="0.75">/api/* · 40 endpoints · role guard before every one</text>
+        <line x1="504" y1="132" x2="864" y2="132" stroke="currentColor" stroke-width="1" opacity="0.2" />
+      
+        <!-- service boxes -->
+        <rect x="504" y="148" width="172" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.4" />
+        <text x="520" y="172" font-size="12" font-weight="600">Auth &amp; sessions</text>
+        <text x="520" y="190" class="m" font-size="9.5" opacity="0.7">/login /register /auth/*</text>
+      
+        <rect x="692" y="148" width="172" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.4" />
+        <text x="708" y="172" font-size="12" font-weight="600">Eligibility</text>
+        <text x="708" y="190" class="m" font-size="9.5" opacity="0.7">/eligibility</text>
+      
+        <rect x="504" y="222" width="172" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.4" />
+        <text x="520" y="246" font-size="12" font-weight="600">Appointments</text>
+        <text x="520" y="264" class="m" font-size="9.5" opacity="0.7">/appointments</text>
+      
+        <rect x="692" y="222" width="172" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.4" />
+        <text x="708" y="246" font-size="12" font-weight="600">Donations</text>
+        <text x="708" y="264" class="m" font-size="9.5" opacity="0.7">/lab-tech/donations</text>
+      
+        <rect x="504" y="296" width="172" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.4" />
+        <text x="520" y="320" font-size="12" font-weight="600">Blood inventory</text>
+        <text x="520" y="338" class="m" font-size="9.5" opacity="0.7">/lab-tech/inventory</text>
+      
+        <rect x="692" y="296" width="172" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.4" />
+        <text x="708" y="320" font-size="12" font-weight="600">Blood requests</text>
+        <text x="708" y="338" class="m" font-size="9.5" opacity="0.7">/blood-requests</text>
+      
+        <rect x="504" y="370" width="172" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.4" />
+        <text x="520" y="394" font-size="12" font-weight="600">Notifications</text>
+        <text x="520" y="412" class="m" font-size="9.5" opacity="0.7">/notifications · mail · SMS</text>
+      
+        <rect x="692" y="370" width="172" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.4" />
+        <text x="708" y="394" font-size="12" font-weight="600">AI assistant</text>
+        <text x="708" y="412" class="m" font-size="9.5" opacity="0.7">/ai-chat · /ai-recommendations</text>
+      
+        <rect x="504" y="444" width="360" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.4" />
+        <text x="520" y="468" font-size="12" font-weight="600">Administration</text>
+        <text x="520" y="486" class="m" font-size="9.5" opacity="0.7">/system-admin/* · /institute-admin/* · /medical-staff/*</text>
+      
+        <line x1="504" y1="524" x2="864" y2="524" stroke="currentColor" stroke-width="1" opacity="0.2" />
+        <text x="504" y="548" class="m" font-size="10" opacity="0.8">Shared rules — eligibility, 56-day interval, blood</text>
+        <text x="504" y="566" class="m" font-size="10" opacity="0.8">compatibility, stock forecast, donor matching</text>
+        <text x="504" y="590" class="m" font-size="10" opacity="0.6">src/lib — one copy, used by every service above</text>
+        <text x="504" y="614" class="m" font-size="10" opacity="0.6">Prisma client · pooled connections</text>
+      
+        <!-- ============ DATA TIER ============ -->
+        <!-- database -->
+        <line x1="884" y1="232" x2="932" y2="232" stroke="currentColor" stroke-width="1.5" marker-end="url(#t-arrow)" />
+        <text x="886" y="224" class="m" font-size="10" opacity="0.75">SQL</text>
+      
+        <g transform="translate(956,150)">
+          <ellipse cx="54" cy="16" rx="52" ry="15" fill="currentColor" opacity="0.08" />
+          <ellipse cx="54" cy="16" rx="52" ry="15" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <path d="M2 16 v26 a52 15 0 0 0 104 0 v-26" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <ellipse cx="54" cy="42" rx="52" ry="15" fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.5" />
+          <path d="M2 42 v26 a52 15 0 0 0 104 0 v-26" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <ellipse cx="54" cy="68" rx="52" ry="15" fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.5" />
+          <path d="M2 68 v26 a52 15 0 0 0 104 0 v-26" fill="none" stroke="currentColor" stroke-width="1.8" />
+        </g>
+        <text x="1010" y="288" text-anchor="middle" font-size="13.5" font-weight="600">Database server</text>
+        <text x="1010" y="306" text-anchor="middle" class="m" font-size="10" opacity="0.7">PostgreSQL :5432 · 16 tables</text>
+      
+        <!-- model server -->
+        <line x1="884" y1="400" x2="932" y2="400" stroke="currentColor" stroke-width="1.5" marker-end="url(#t-arrow)" />
+        <text x="886" y="392" class="m" font-size="10" opacity="0.75">HTTP</text>
+      
+        <g transform="translate(962,346)">
+          <rect x="0" y="0" width="96" height="108" rx="5" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <rect x="10" y="12" width="76" height="24" rx="3" fill="currentColor" opacity="0.08" />
+          <circle cx="76" cy="24" r="3.5" fill="currentColor" opacity="0.45" />
+          <rect x="10" y="42" width="76" height="24" rx="3" fill="currentColor" opacity="0.08" />
+          <circle cx="76" cy="54" r="3.5" fill="currentColor" opacity="0.45" />
+          <rect x="10" y="72" width="76" height="24" rx="3" fill="currentColor" opacity="0.08" />
+          <circle cx="76" cy="84" r="3.5" fill="currentColor" opacity="0.45" />
+        </g>
+        <text x="1010" y="478" text-anchor="middle" font-size="13.5" font-weight="600">Model server</text>
+        <text x="1010" y="496" text-anchor="middle" class="m" font-size="10" opacity="0.7">llama.cpp :8080</text>
+        <text x="1010" y="511" text-anchor="middle" class="m" font-size="10" opacity="0.7">Qwen2.5-1.5B</text>
+      
+        <!-- external -->
+        <line x1="884" y1="576" x2="932" y2="576" stroke-width="1.5" class="as" marker-end="url(#t-arrow-accent)" />
+        <text x="880" y="568" class="m a" font-size="10" text-anchor="end">leaves the machine</text>
+      
+        <path d="M956 588 a20 20 0 0 1 8 -38 a26 26 0 0 1 49 -6 a18 18 0 0 1 21 26 a16 16 0 0 1 -14 18 z" fill="none" stroke-width="1.6" class="as" />
+        <text x="1010" y="622" text-anchor="middle" font-size="13.5" font-weight="600">External APIs</text>
+        <text x="1010" y="640" text-anchor="middle" class="m" font-size="10" opacity="0.7">Gmail SMTP :587</text>
+        <text x="1010" y="655" text-anchor="middle" class="m" font-size="10" opacity="0.7">Google Identity · SMS</text>
+      
+        <!-- ============ THE PHYSICAL TRUTH ============ -->
+        <line x1="30" y1="690" x2="1170" y2="690" stroke="currentColor" stroke-width="1" opacity="0.2" />
+        <g transform="translate(34,706)">
+          <rect x="0" y="0" width="46" height="29" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.5" />
+          <rect x="4" y="4" width="38" height="21" rx="1.5" fill="currentColor" opacity="0.08" />
+          <path d="M-6 34 H52 L46 29 H0 Z" fill="currentColor" opacity="0.35" />
+        </g>
+        <text x="96" y="720" font-size="12" font-weight="600">Today all four tiers run on one device</text>
+        <text x="96" y="738" class="m" font-size="10" opacity="0.7">HP ENVY x360 15-eu0xxx · Windows 11 · Ryzen 5 5500U 6C/12T · 7.3 GB — the tiers above are logical, not separate hardware</text>
+      </svg>

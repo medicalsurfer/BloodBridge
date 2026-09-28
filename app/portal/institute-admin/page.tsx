@@ -626,7 +626,7 @@ export default function InstituteAdminPage() {
                       <div className="flex gap-4">
                         <div
                           aria-hidden
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-red-100"
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10 on-garnet"
                         >
                           <Building2 size={18} />
                         </div>
@@ -640,7 +640,7 @@ export default function InstituteAdminPage() {
                             {institute.name}
                           </h2>
 
-                          <div className="mt-3 space-y-1.5 text-xs text-red-100">
+                          <div className="mt-3 space-y-1.5 text-xs on-garnet">
                             <p className="flex items-center gap-2">
                               <MapPin size={13} aria-hidden />
                               {[institute.address, institute.city, institute.region]

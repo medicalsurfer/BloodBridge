@@ -494,7 +494,7 @@ function RegistrationPanel() {
       <div className="relative z-10 mx-auto w-full max-w-[680px]">
         {/* INTRO */}
         <div className="mb-4">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-red-100">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.18em] on-garnet">
             <span className="h-1.5 w-1.5 rounded-full bg-red-200" />
             Join BloodBridge
           </span>
@@ -503,7 +503,7 @@ function RegistrationPanel() {
             Start your journey as a blood donor.
           </h2>
 
-          <p className="mt-2 max-w-xl text-xs leading-5 text-red-100/75">
+          <p className="mt-2 max-w-xl text-xs leading-5 on-garnet">
             Create your donor account and stay connected with healthcare
             institutions when your donation can make a difference.
           </p>

@@ -87,8 +87,8 @@
   right: 24px;
   bottom: 88px;
   z-index: 59;
-  width: min(378px, calc(100vw - 32px));
-  height: min(560px, calc(100dvh - 140px));
+  width: min(410px, calc(100vw - 32px));
+  height: min(600px, calc(100dvh - 132px));
   background: var(--bb-surface);
   border: 1px solid var(--bb-border);
   border-radius: 20px;
@@ -221,10 +221,10 @@
 .msgs {
   flex: 1;
   min-height: 0;
-  padding: 16px 14px;
+  padding: 20px 16px 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 18px;
   overflow-y: auto;
   background: var(--bb-chat-canvas);
   scrollbar-width: thin;
@@ -244,11 +244,11 @@
 }
 
 .msg {
-  max-width: 86%;
+  max-width: 88%;
   padding: 9px 13px;
   border-radius: 16px;
-  font-size: 12.75px;
-  line-height: 1.5;
+  font-size: 13.5px;
+  line-height: 1.62;
   white-space: pre-wrap;
   word-break: break-word;
   animation: bbMsgIn 0.28s var(--ease-out-soft) both;
@@ -268,11 +268,73 @@
     animation: none;
   }
 }
+/*
+  The assistant does not speak in a bubble.
+
+  A bubble on both sides reads as two people messaging. An avatar followed by
+  the answer set plainly on the canvas reads as software answering, which is
+  what every current AI chat does — and it gives a long reply the full column
+  instead of squeezing it into 86% of a narrow one.
+*/
 .msgBot {
-  background: var(--bb-surface);
-  border: 1px solid var(--bb-border);
-  align-self: flex-start;
-  border-bottom-left-radius: 5px;
+  align-self: stretch;
+  max-width: none;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  border: 0;
+  color: var(--bb-text);
+}
+
+.botRow {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  animation: bbMsgIn 0.28s var(--ease-out-soft) both;
+}
+.botAvatar {
+  flex: none;
+  width: 27px;
+  height: 27px;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--bb-accent);
+  color: var(--bb-on-accent);
+}
+.botBody {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Trails the reply while it is still arriving. */
+.cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--bb-accent);
+  animation: bbCaret 1s steps(2, start) infinite;
+}
+@keyframes bbCaret {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .botRow {
+    animation: none;
+  }
+  .cursor {
+    animation: none;
+  }
 }
 .msgUser {
   background: var(--bb-accent);
@@ -290,15 +352,13 @@
 
 /* Three dots while the model composes its first words. */
 .typing {
-  align-self: flex-start;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  border-bottom-left-radius: 5px;
-  background: var(--bb-surface);
-  border: 1px solid var(--bb-border);
+  gap: 5px;
+  height: 27px;
+  padding: 0;
+  background: none;
+  border: 0;
 }
 .typing span {
   width: 6px;

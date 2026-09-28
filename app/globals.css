@@ -732,6 +732,79 @@ table {
   background-clip: content-box;
 }
 
+/*
+  Text on the garnet panels.
+
+  Those surfaces are dark in both themes, but the red-* scale is not: dark mode
+  re-points red-100 to oklch(30%), which is almost exactly the lightness of the
+  panel behind it. Copy set in it measured 1.13:1 against the hero gradient —
+  invisible, where 4.5:1 is the floor.
+
+  These two tints are fixed, and taken from the brand hue rather than gray, so
+  they belong to the surface they sit on. Measured against the lightest stop of
+  the gradient: 10.4:1 and 8.3:1.
+*/
+.on-garnet {
+  color: oklch(91% 0.035 12.094);
+}
+
+.on-garnet-dim {
+  color: oklch(84% 0.05 12.094);
+}
+
+/*
+  Loading placeholders.
+
+  A skeleton stands where the content will be, at its real size, so the layout
+  does not jump when the data lands. The sweep travels left to right — the
+  direction the eye reads — rather than pulsing the whole block, which reads
+  as a warning more than as progress.
+
+  `.bbSkeleton` is the shape; put it on an element that already has the width
+  and height of what it replaces. The global prefers-reduced-motion rule above
+  stops the sweep and leaves a plain resting block.
+*/
+.bbSkeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--color-slate-200);
+}
+
+.bbSkeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(100% 0 0 / 0.65) 50%,
+    transparent 100%
+  );
+  animation: bb-skeleton-sweep 1.6s var(--ease-in-out-soft) infinite;
+}
+
+@keyframes bb-skeleton-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* On the garnet panels the sweep has to be a lift, not a white wash. */
+.bbSkeleton--onDark {
+  background: oklch(100% 0 0 / 0.1);
+}
+
+.bbSkeleton--onDark::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(100% 0 0 / 0.18) 50%,
+    transparent 100%
+  );
+}
+
 /* The same dark-mode corrections for visitors who chose nothing and whose system asks for dark. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {

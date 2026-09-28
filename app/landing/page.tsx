@@ -240,7 +240,7 @@ function HeroPanel() {
             style={{ animation: "var(--animate-rise)", animationDelay: "200ms" }}
           >
             <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gold" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-red-100">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] on-garnet">
               A connected donation network
             </span>
           </div>
@@ -253,7 +253,7 @@ function HeroPanel() {
           </h2>
 
           <p
-            className="mt-4 max-w-[430px] text-[13.5px] leading-6 text-red-100/75"
+            className="mt-4 max-w-[430px] text-[13.5px] leading-6 on-garnet"
             style={{ animation: "var(--animate-rise)", animationDelay: "340ms" }}
           >
             BloodBridge connects eligible donors with healthcare institutions and helps blood
@@ -339,7 +339,7 @@ function NetworkDiagram() {
 
           <p className="mt-3 text-sm font-semibold text-white">BloodBridge</p>
 
-          <p className="mt-1 text-[8px] tracking-[0.14em] text-red-100/60 uppercase">
+          <p className="mt-1 text-[8px] tracking-[0.14em] on-garnet-dim uppercase">
             Connecting lives
           </p>
         </div>
@@ -358,7 +358,7 @@ function NetworkDiagram() {
         </div>
 
         <div className="mt-3 flex items-center justify-between rounded-xl bg-white/[0.08] px-3 py-2">
-          <span className="text-[9px] text-red-100/70">Blood group</span>
+          <span className="text-[9px] on-garnet-dim">Blood group</span>
           <span className="font-mono text-sm font-medium text-gold">O+</span>
         </div>
       </FloatingCard>
@@ -393,7 +393,7 @@ function NetworkDiagram() {
           <div>
             <CardLabel>Emergency request</CardLabel>
             <p className="mt-1 text-[11px] font-semibold text-white">O- blood urgently needed</p>
-            <p className="mt-1 text-[8px] text-red-100/65">Matching eligible donors nearby</p>
+            <p className="mt-1 text-[8px] on-garnet-dim">Matching eligible donors nearby</p>
           </div>
         </div>
       </FloatingCard>
@@ -412,7 +412,7 @@ function NetworkDiagram() {
 
         <div className="mt-3">
           <div className="mb-1.5 flex items-center justify-between text-[8px]">
-            <span className="text-red-100/60">Match confidence</span>
+            <span className="on-garnet-dim">Match confidence</span>
             <span className="font-mono font-medium text-white">94%</span>
           </div>
 
@@ -468,7 +468,7 @@ function FloatingCard({
 
 function CardLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[8px] font-semibold tracking-[0.12em] text-red-100/60 uppercase">
+    <p className="text-[8px] font-semibold tracking-[0.12em] on-garnet-dim uppercase">
       {children}
     </p>
   );
@@ -657,16 +657,29 @@ function InstitutionSection() {
             Improve blood coordination across your institution.
           </h2>
 
-          <p className="mt-5 max-w-[580px] text-[15px] leading-7 text-red-100/75">
+          <p className="mt-5 max-w-[580px] text-[15px] leading-7 on-garnet">
             Healthcare institutions can use BloodBridge to manage blood requests, coordinate donor
             appointments, monitor blood stock and communicate with donors.
           </p>
 
+          {/*
+            No public sign-up for institutes. A system administrator registers
+            the institute and invites its administrator, who then adds their own
+            medical staff and laboratory technicians — so the only action this
+            section can honestly offer is a way in for an institute already on
+            the network.
+          */}
+          <p className="mt-6 max-w-[580px] text-[14px] leading-7 on-garnet-dim">
+            Institutes join the network by arrangement. A BloodBridge system administrator registers
+            the institute and invites its administrator, who then adds the institute&apos;s medical
+            staff and laboratory technicians.
+          </p>
+
           <Link
-            href="/institution/register"
-            className="group mt-8 inline-flex h-12 items-center gap-2 rounded-xl bg-white px-6 text-sm font-semibold text-garnet transition duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/20"
+            href="/login"
+            className="group mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-white px-6 text-sm font-semibold text-garnet transition duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/20"
           >
-            Register an institution
+            Institution sign in
             <span className="transition-transform duration-300 group-hover:translate-x-1">
               <ArrowIcon />
             </span>
@@ -716,7 +729,7 @@ function CallToAction() {
             Your next donation could help someone when it matters most.
           </h2>
 
-          <p className="mx-auto mt-4 max-w-[600px] text-[15px] leading-7 text-red-100/75">
+          <p className="mx-auto mt-4 max-w-[600px] text-[15px] leading-7 on-garnet">
             Create your BloodBridge donor account and become part of a more connected blood
             donation network.
           </p>
@@ -855,7 +868,7 @@ function InstitutionCard({ value, label }: { value: string; label: string }) {
   return (
     <div className="h-full rounded-2xl border border-white/12 bg-white/[0.07] p-5 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-white/[0.12]">
       <p className="text-lg font-semibold text-white">{value}</p>
-      <p className="mt-1.5 text-xs text-red-100/70">{label}</p>
+      <p className="mt-1.5 text-xs on-garnet-dim">{label}</p>
     </div>
   );
 }

@@ -79,6 +79,13 @@ export function buildRuleBasedRecommendations(input: {
 export async function generateAiSummary(
   recommendations: BloodGroupRecommendation[],
   instituteName: string,
+  /*
+    The forecast, already computed in src/lib/shortage-forecast.ts. It is
+    handed over as finished sentences so the model is rephrasing arithmetic
+    rather than being asked for a prediction of its own — the numbers a
+    laboratory acts on are not a language model's to invent.
+  */
+  forecastLines: string[] = [],
 ): Promise<string | null> {
   const priorityOrder: RecommendationPriority[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "OK"];
   const summaryLines = [...recommendations]
@@ -89,17 +96,21 @@ export async function generateAiSummary(
     )
     .join("\n");
 
+  const forecastBlock = forecastLines.length
+    ? `\n\nProjections already calculated from this institute's records:\n${forecastLines.join("\n")}`
+    : "";
+
   return completeChat(
     [
       {
         role: "system",
         content:
-          "You are a blood bank supply analyst on the BloodBridge platform. Write short, plain-English decision-support notes for laboratory staff. Staff make the final decisions.",
+          "You are a blood bank supply analyst on the BloodBridge platform. Write short, plain-English decision-support notes for laboratory staff. Staff make the final decisions. Use only the figures you are given: never estimate, extrapolate or invent a number, and if the data says a trend is unknown, say it is unknown.",
       },
       {
         role: "user",
         content: `Stock data for ${instituteName}:
-${summaryLines}
+${summaryLines}${forecastBlock}
 
 In 3-4 sentences, recommend what the laboratory team should prioritise this week. Be specific about blood groups and don't repeat the raw numbers back verbatim.`,
       },

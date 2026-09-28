@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { FlaskConical, LayoutDashboard, Minus, Plus, RefreshCw, Sparkles } from "lucide-react";
 import {
   TrendAreaChart,
@@ -13,6 +13,7 @@ import {
   weekdayCounts,
 } from "@/src/components/dashboard/DashboardWidgets";
 import { PortalShell, type PortalNavGroup } from "@/src/components/dashboard/PortalShell";
+import { BloodBag, STOCK_STYLES, stockLevel } from "@/src/components/ui/BloodBag";
 import {
   PageHeader,
   StatGrid,
@@ -130,6 +131,18 @@ export default function LabTechnicianPortalPage() {
   const [topRecommendation, setTopRecommendation] = useState<Recommendation | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  /*
+    The assistant has its own loading flag.
+
+    It used to share `loading` with everything else, because all four requests
+    were awaited together in one Promise.all. Three of them return in
+    milliseconds; the fourth waits for the language model to write a
+    paragraph, which takes seconds on a warm model and much longer on a cold
+    one. The effect was that the inventory — already fetched, already in hand
+    — sat behind a spinner until the model had finished writing.
+  */
+  const [insightLoading, setInsightLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [actionId, setActionId] = useState<string | null>(null);
@@ -145,6 +158,15 @@ export default function LabTechnicianPortalPage() {
   );
 
   const totalUnits = useMemo(() => inventory.reduce((sum, row) => sum + row.units, 0), [inventory]);
+
+  /*
+    One scale for every bag: the fullest group tops them all out, with a floor
+    so a nearly empty shelf does not make two units look like a full bag.
+  */
+  const fullBag = useMemo(
+    () => Math.max(10, ...inventory.map((row) => row.units)),
+    [inventory],
+  );
   const lowStockGroups = useMemo(
     () => inventory.filter((row) => row.units < LOW_STOCK_THRESHOLD).length,
     [inventory],
@@ -179,23 +201,63 @@ export default function LabTechnicianPortalPage() {
     [inventory],
   );
 
-  async function loadAll() {
-    setLoading(true);
-    setError("");
+  /*
+    The assistant's read on the stock. Fetched on its own, never awaited with
+    the rest, so a slow model delays nothing but its own card.
+  */
+  const applyInsights = useCallback(async (request: Promise<Response | null>) => {
+    try {
+      const response = await request;
+
+      if (!response?.ok) return;
+
+      const data = await response.json().catch(() => ({}));
+      const priorityOrder: RecommendationPriority[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "OK"];
+      const recommendations: Recommendation[] = data.recommendations ?? [];
+      const sorted = [...recommendations].sort(
+        (a, b) => priorityOrder.indexOf(a.priority) - priorityOrder.indexOf(b.priority),
+      );
+
+      setTopRecommendation(sorted[0] ?? null);
+      setAiSummary(data.aiSummary ?? null);
+    } catch {
+      // The workspace works without it; the card says so.
+    } finally {
+      setInsightLoading(false);
+    }
+  }, []);
+
+  /*
+    Sets no state before its first await: `loading` and `insightLoading`
+    both start true, so the mount fetch has nothing to announce. A spinner
+    raised synchronously from inside an effect is the cascading render that
+    react-hooks/set-state-in-effect exists to prevent — `refresh` below
+    raises the flags for the reloads a person asks for.
+  */
+  const loadAll = useCallback(async () => {
+    /*
+      The assistant's request goes out now, alongside the other three, but is
+      read at the end: its answer waits on the language model, and nothing on
+      this screen should. Starting the fetch here rather than calling a
+      state-setting function keeps the effect's synchronous path free of
+      setState, which is what react-hooks/set-state-in-effect asks for.
+    */
+    const insightsRequest = fetch("/api/lab-tech/ai-recommendations", {
+      credentials: "include",
+      cache: "no-store",
+    }).catch(() => null);
 
     try {
-      const [appointmentsRes, donationsRes, inventoryRes, aiRes] = await Promise.all([
+      const [appointmentsRes, donationsRes, inventoryRes] = await Promise.all([
         fetch("/api/lab-tech/appointments", { credentials: "include", cache: "no-store" }),
         fetch("/api/lab-tech/donations", { credentials: "include", cache: "no-store" }),
         fetch("/api/lab-tech/inventory", { credentials: "include", cache: "no-store" }),
-        fetch("/api/lab-tech/ai-recommendations", { credentials: "include", cache: "no-store" }),
       ]);
 
-      const [appointmentsData, donationsData, inventoryData, aiData] = await Promise.all([
+      const [appointmentsData, donationsData, inventoryData] = await Promise.all([
         appointmentsRes.json().catch(() => ({})),
         donationsRes.json().catch(() => ({})),
         inventoryRes.json().catch(() => ({})),
-        aiRes.json().catch(() => ({})),
       ]);
 
       if (!appointmentsRes.ok) throw new Error(appointmentsData.error ?? "Unable to load appointments.");
@@ -205,26 +267,27 @@ export default function LabTechnicianPortalPage() {
       setPendingAppointments(appointmentsData.appointments ?? []);
       setDonations(donationsData.donations ?? []);
       setInventory(inventoryData.inventory ?? []);
-
-      if (aiRes.ok) {
-        const priorityOrder: RecommendationPriority[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "OK"];
-        const recommendations: Recommendation[] = aiData.recommendations ?? [];
-        const sorted = [...recommendations].sort(
-          (a, b) => priorityOrder.indexOf(a.priority) - priorityOrder.indexOf(b.priority),
-        );
-        setTopRecommendation(sorted[0] ?? null);
-        setAiSummary(aiData.aiSummary ?? null);
-      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load your workspace.");
     } finally {
       setLoading(false);
     }
-  }
+
+    // Read once the rest of the workspace is on screen.
+    void applyInsights(insightsRequest);
+  }, [applyInsights]);
+
+  /** A reload the user asked for, which does announce itself. */
+  const refresh = useCallback(() => {
+    setLoading(true);
+    setInsightLoading(true);
+    setError("");
+    void loadAll();
+  }, [loadAll]);
 
   useEffect(() => {
     void loadAll();
-  }, []);
+  }, [loadAll]);
 
   function startRecording(appointmentId: string) {
     setRecordingId(appointmentId);
@@ -267,7 +330,7 @@ export default function LabTechnicianPortalPage() {
       );
       setNotice("Donation recorded and added to inventory.");
       setRecordingId(null);
-      void loadAll();
+      refresh();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to record donation.");
     } finally {
@@ -375,7 +438,7 @@ export default function LabTechnicianPortalPage() {
                   </div>
 
                   <button
-                    onClick={loadAll}
+                    onClick={refresh}
                     className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-300 px-5 text-[13px] font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
                   >
                     <RefreshCw size={15} />
@@ -485,18 +548,37 @@ export default function LabTechnicianPortalPage() {
                             {topRecommendation.message}
                           </p>
                         </>
+                      ) : insightLoading ? (
+                        <div aria-busy="true" aria-label="Reading stock levels">
+                          <div className="bbSkeleton h-3.5 w-40" />
+                          <div className="bbSkeleton mt-2 h-3 w-56" />
+                        </div>
                       ) : (
                         <p className="text-xs leading-5 text-slate-600">
-                          {loading
-                            ? "Analysing your inventory…"
-                            : "Stock levels look healthy across all blood groups."}
+                          Stock levels look healthy across all blood groups.
                         </p>
                       )}
 
-                      {aiSummary && (
-                        <p className="mt-3 rounded-xl border border-slate-200 p-3 text-xs leading-5 text-slate-600">
-                          {aiSummary}
-                        </p>
+                      {/*
+                        The written summary lands after the priority above it,
+                        since it waits on the model rather than on the figures.
+                      */}
+                      {insightLoading ? (
+                        <div
+                          aria-busy="true"
+                          aria-label="Drafting a summary"
+                          className="mt-3 rounded-xl border border-slate-200 p-3"
+                        >
+                          <div className="bbSkeleton h-3 w-full" />
+                          <div className="bbSkeleton mt-2 h-3 w-[85%]" />
+                          <div className="bbSkeleton mt-2 h-3 w-[60%]" />
+                        </div>
+                      ) : (
+                        aiSummary && (
+                          <p className="mt-3 rounded-xl border border-slate-200 p-3 text-xs leading-5 text-slate-600">
+                            {aiSummary}
+                          </p>
+                        )
                       )}
                     </div>
                   </div>
@@ -507,45 +589,99 @@ export default function LabTechnicianPortalPage() {
                 <div className="mt-7">
                   <Panel label="Blood inventory">
                     {loading ? (
-                      <p className="mt-5 text-sm text-slate-500">Loading inventory…</p>
-                    ) : (
-                      <div className="mt-5 grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-2 lg:grid-cols-4">
-                        {inventory.map((row) => (
-                          <div key={row.bloodGroup} className="bg-white px-5 py-5">
-                            <Eyebrow>{bloodGroupLabels[row.bloodGroup]}</Eyebrow>
-
-                            <p
-                              className={`mt-3 text-[26px] font-bold leading-none tracking-[-0.02em] tabular-nums ${
-                                row.units < LOW_STOCK_THRESHOLD ? "text-red-800" : "text-slate-950"
-                              }`}
-                            >
-                              {row.units}
-                            </p>
-
-                            <p className="mt-2.5 text-xs text-slate-500">
-                              units{row.units < LOW_STOCK_THRESHOLD ? " · low stock" : ""}
-                            </p>
-
-                            <div className="mt-4 flex gap-2">
-                              <button
-                                onClick={() => adjustInventory(row.bloodGroup, -1)}
-                                disabled={actionId === row.bloodGroup || row.units === 0}
-                                aria-label={`Remove one ${bloodGroupLabels[row.bloodGroup]} unit`}
-                                className={stepperClass}
-                              >
-                                <Minus size={14} />
-                              </button>
-                              <button
-                                onClick={() => adjustInventory(row.bloodGroup, 1)}
-                                disabled={actionId === row.bloodGroup}
-                                aria-label={`Add one ${bloodGroupLabels[row.bloodGroup]} unit`}
-                                className={stepperClass}
-                              >
-                                <Plus size={14} />
-                              </button>
-                            </div>
+                      /*
+                        Eight tiles at the size the real ones occupy, so the
+                        grid does not reflow when the figures arrive.
+                      */
+                      <div
+                        aria-busy="true"
+                        aria-label="Loading blood inventory"
+                        className="mt-5 grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-2 lg:grid-cols-4"
+                      >
+                        {Array.from({ length: 8 }, (_, index) => (
+                          <div key={index} className="bg-white px-5 py-5">
+                            <div className="bbSkeleton h-2.5 w-10" />
+                            <div className="bbSkeleton mt-3 h-[26px] w-14" />
+                            <div className="bbSkeleton mt-3 h-2.5 w-20" />
                           </div>
                         ))}
+                      </div>
+                    ) : (
+                      /*
+                        Each group is a bag filled to what is on the shelf,
+                        against the fullest group as the top of every bag — so
+                        a glance across the row is a glance across the stock.
+                        The colour says whether that amount is a problem, and
+                        the word underneath says it again for anyone who does
+                        not read the colour.
+                      */
+                      <div className="mt-5 grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-2 lg:grid-cols-4">
+                        {inventory.map((row) => {
+                          const level = stockLevel(row.units);
+                          const style = STOCK_STYLES[level];
+
+                          return (
+                            <div key={row.bloodGroup} className="bg-white px-5 py-5">
+                              <div className="flex items-start gap-3.5">
+                                <BloodBag
+                                  units={row.units}
+                                  fullMark={fullBag}
+                                  color={style.mark}
+                                  label={row.bloodGroup}
+                                  className="h-[60px] w-10"
+                                />
+
+                                <div className="min-w-0">
+                                  <Eyebrow>{bloodGroupLabels[row.bloodGroup]}</Eyebrow>
+
+                                  <p
+                                    className={`mt-1.5 text-[26px] leading-none font-bold tracking-[-0.02em] tabular-nums ${
+                                      level === "healthy" ? "text-slate-950" : style.ink
+                                    }`}
+                                  >
+                                    {row.units}
+                                  </p>
+
+                                  <p className="mt-1.5 text-xs text-slate-500">
+                                    unit{row.units === 1 ? "" : "s"}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="mt-3.5 flex items-center justify-between gap-2">
+                                <span
+                                  className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${style.ink}`}
+                                >
+                                  <span
+                                    aria-hidden
+                                    className="h-1.5 w-1.5 rounded-full"
+                                    style={{ backgroundColor: style.mark }}
+                                  />
+                                  {style.word}
+                                </span>
+
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => adjustInventory(row.bloodGroup, -1)}
+                                    disabled={actionId === row.bloodGroup || row.units === 0}
+                                    aria-label={`Remove one ${bloodGroupLabels[row.bloodGroup]} unit`}
+                                    className={stepperClass}
+                                  >
+                                    <Minus size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => adjustInventory(row.bloodGroup, 1)}
+                                    disabled={actionId === row.bloodGroup}
+                                    aria-label={`Add one ${bloodGroupLabels[row.bloodGroup]} unit`}
+                                    className={stepperClass}
+                                  >
+                                    <Plus size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </Panel>
@@ -555,7 +691,17 @@ export default function LabTechnicianPortalPage() {
                   <Panel label="Donations to record" padded={false}>
                     <div className="mt-5 border-t border-slate-100">
                       {loading ? (
-                        <p className="px-6 py-8 text-sm text-slate-500">Loading appointments…</p>
+                        <div aria-busy="true" aria-label="Loading appointments">
+                          {Array.from({ length: 3 }, (_, index) => (
+                            <div
+                              key={index}
+                              className="border-b border-slate-100 px-6 py-4 last:border-b-0"
+                            >
+                              <div className="bbSkeleton h-3.5 w-48" />
+                              <div className="bbSkeleton mt-2 h-3 w-64" />
+                            </div>
+                          ))}
+                        </div>
                       ) : unrecordedAppointments.length === 0 ? (
                         <div className="p-6">
                           <EmptyState
@@ -674,7 +820,17 @@ export default function LabTechnicianPortalPage() {
                   <Panel label="Recent donations" padded={false}>
                     <div className="mt-5 border-t border-slate-100">
                       {loading ? (
-                        <p className="px-6 py-8 text-sm text-slate-500">Loading donations…</p>
+                        <div aria-busy="true" aria-label="Loading donations">
+                          {Array.from({ length: 3 }, (_, index) => (
+                            <div
+                              key={index}
+                              className="border-b border-slate-100 px-6 py-4 last:border-b-0"
+                            >
+                              <div className="bbSkeleton h-3.5 w-48" />
+                              <div className="bbSkeleton mt-2 h-3 w-64" />
+                            </div>
+                          ))}
+                        </div>
                       ) : donations.length === 0 ? (
                         <div className="p-6">
                           <EmptyState

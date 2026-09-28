@@ -2,7 +2,7 @@
 
 // Next.js navigation component
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // React types and hooks
 import { FormEvent, useState } from "react";
@@ -10,8 +10,29 @@ import { FormEvent, useState } from "react";
 // Main BloodBridge brand colour
 const PRIMARY_RED = "oklch(27.1% 0.105 12.094)";
 
+/*
+  Google sign-in happens across a browser redirect, so it cannot return a
+  message the way the fetch to /api/login does. The callback sends the donor
+  back to /login?error=<reason> instead, and these are the sentences those
+  reasons stand for. Each one names what went wrong and what to do next.
+*/
+const GOOGLE_SIGN_IN_ERRORS: Record<string, string> = {
+  google_unavailable:
+    "Google sign-in is not configured on this server yet. Use your email and password for now.",
+  google_cancelled:
+    "Google sign-in was cancelled. Nothing changed — try again, or use your email and password.",
+  google_domain:
+    "That Google account uses an address we cannot accept. Only Gmail and iCloud addresses are allowed.",
+  account_inactive:
+    "This account is inactive. Please contact your BloodBridge administrator.",
+  rate_limited: "Too many sign-in attempts. Please wait a few minutes and try again.",
+  google_failed:
+    "Google sign-in could not be completed. Please try again, or use your email and password.",
+};
+
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Controls whether the password is visible
   const [showPassword, setShowPassword] = useState(false);
@@ -28,11 +49,33 @@ export default function LoginPage() {
   // Error message shown if login fails
   const [error, setError] = useState<string | null>(null);
 
+  // Once the form is used, its result replaces any message carried in the URL.
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+
   // Stores the email and password entered by the user
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
+
+  /*
+    A failed Google sign-in comes back as /login?error=<reason>, which is the
+    only way a redirect can report anything. It is read straight out of the
+    URL and shown where a password failure would appear.
+
+    Derived rather than copied into state: useSearchParams resolves on the
+    server and the client alike, so there is no effect writing state after
+    mount and no first paint that disagrees with the markup. Submitting the
+    form supersedes it, since the form's own error takes precedence below.
+  */
+  const signInError = (() => {
+    const reason = searchParams.get("error");
+    if (!reason) return null;
+
+    return GOOGLE_SIGN_IN_ERRORS[reason] ?? GOOGLE_SIGN_IN_ERRORS.google_failed;
+  })();
+
+  const shownError = error ?? (hasSubmitted ? null : signInError);
 
   function isAllowedEmail(email: string) {
   const normalizedEmail = email.trim().toLowerCase();
@@ -49,6 +92,7 @@ export default function LoginPage() {
     event.preventDefault();
 
     // Reset previous messages
+    setHasSubmitted(true);
     setError(null);
     setMessage(null);
 
@@ -264,7 +308,7 @@ if (!isAllowedEmail(normalizedEmail)) {
                   </div>
 
                   {/* LOGIN ERROR */}
-                  {error && (
+                  {shownError && (
                     <div
                       role="alert"
                       className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3"
@@ -279,7 +323,7 @@ if (!isAllowedEmail(normalizedEmail)) {
                         </p>
 
                         <p className="mt-0.5 text-xs leading-5 text-red-700">
-                          {error}
+                          {shownError}
                         </p>
                       </div>
                     </div>
@@ -338,14 +382,24 @@ if (!isAllowedEmail(normalizedEmail)) {
                   <div className="h-px flex-1 bg-slate-200" />
                 </div>
 
-                {/* SOCIAL LOGIN BUTTONS */}
-                <button
-                  type="button"
-                  className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                {/*
+                  A link, not a button: signing in with Google is a navigation
+                  away to accounts.google.com, which /api/auth/google performs
+                  after minting the state and nonce the callback checks.
+                  `aria-disabled` rather than a disabled attribute, because an
+                  anchor has no disabled state to set.
+                */}
+                <a
+                  href="/api/auth/google"
+                  aria-disabled={isLoading}
+                  onClick={(event) => {
+                    if (isLoading) event.preventDefault();
+                  }}
+                  className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 aria-disabled:pointer-events-none aria-disabled:opacity-60"
                 >
                   <GoogleIcon />
-                  Google
-                </button>
+                  Continue with Google
+                </a>
 
                 {/* REGISTER LINK */}
                 <p className="mt-5 text-center text-sm text-slate-500">
@@ -420,10 +474,38 @@ function Header() {
   );
 }
 
-// Decorative donor information displayed on desktop
+/*
+  The panel beside the form, on desktop.
+
+  It used to be a white dashboard card floating on the gradient: a made-up
+  donor's blood group, donation count and next appointment, shown to someone
+  who has not signed in yet. It read as a screenshot pasted onto the page, and
+  the facts in it belonged to nobody.
+
+  What replaces it is set on the gradient itself rather than in a container,
+  and every figure is a rule that is true before anyone signs in — two of them
+  the platform's own (MIN_DAYS_BETWEEN_DONATIONS and ELIGIBILITY_VALID_FOR_MS
+  in src/lib/eligibility.ts). The ledger's last rule does not stop: it carries
+  on as a heartbeat that draws itself once.
+*/
 function DonorPanel() {
   return (
-    <aside className="relative hidden min-h-0 overflow-hidden bg-gradient-to-br from-garnet via-plum to-garnet-deep px-8 py-8 text-white lg:flex lg:h-full lg:flex-col lg:justify-center xl:px-12">
+    <aside
+      className="relative hidden min-h-0 overflow-hidden bg-gradient-to-br from-garnet via-plum to-garnet-deep px-8 py-8 text-white lg:flex lg:h-full lg:flex-col lg:justify-center xl:px-12"
+      /*
+        This panel is a dark garnet surface in both themes, so its text cannot
+        use the red-* scale: dark mode re-points red-100 to oklch(30%), which
+        is the lightness of the panel itself, and the copy disappears. These
+        two tints are fixed, and taken from the brand hue rather than gray so
+        they belong to the surface they sit on.
+      */
+      style={
+        {
+          "--panel-text": "oklch(91% 0.035 12.094)",
+          "--panel-text-dim": "oklch(84% 0.05 12.094)",
+        } as React.CSSProperties
+      }
+    >
       <DecorativeBackground />
 
       {/*
@@ -431,286 +513,146 @@ function DonorPanel() {
         max-w, which used to overshoot the 1.05fr track at 1440px and clip the
         heading. `min-w-0` lets the flex child actually shrink.
       */}
-      <div className="relative z-10 mx-auto flex min-w-0 w-full max-w-[580px] flex-col justify-center">
-        <div className="mb-6">
-          <span
-            className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-semibold tracking-[0.14em] text-red-100 uppercase backdrop-blur-sm"
-            style={{ animation: "var(--animate-rise)", animationDelay: "80ms" }}
-          >
-            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gold" />
-            Your donation journey
-          </span>
+      <div
+        className="relative z-10 mx-auto flex min-w-0 w-full max-w-[540px] flex-col justify-center"
+        style={{ animation: "var(--animate-rise)", animationDelay: "120ms" }}
+      >
+        <h2 className="text-[34px] leading-[1.06] font-semibold tracking-[-0.025em] text-balance xl:text-[40px]">
+          Every donation creates another chance at life.
+        </h2>
 
-          <h2
-            className="mt-4 text-[28px] leading-[1.12] font-semibold tracking-[-0.02em] text-balance xl:text-[32px]"
-            style={{ animation: "var(--animate-rise)", animationDelay: "150ms" }}
-          >
-            Every donation creates another chance at life.
-          </h2>
+        <p className="mt-5 max-w-[46ch] text-[15px] leading-7 text-[var(--panel-text)]">
+          Follow your eligibility, appointments and donation impact from your
+          BloodBridge donor account.
+        </p>
 
-          <p
-            className="mt-3 text-[13.5px] leading-6 text-red-100/75"
-            style={{ animation: "var(--animate-rise)", animationDelay: "220ms" }}
-          >
-            Follow your eligibility, appointments and donation impact from your BloodBridge donor
-            account.
-          </p>
-        </div>
+        <ImpactLedger />
 
-        <div
-          className="w-full rounded-2xl border border-white/20 bg-white/95 p-4 text-slate-900 shadow-2xl backdrop-blur-sm"
-          style={{ animation: "var(--animate-rise)", animationDelay: "300ms" }}
-        >
-          <DonorDashboardPreview />
-        </div>
+        <p className="mt-7 text-[13px] leading-6 text-[var(--panel-text-dim)]">
+          Screened before every visit, recorded the moment it happens.
+        </p>
       </div>
     </aside>
   );
 }
 
-function DonorDashboardPreview() {
+/*
+  Three rules of donation, as a specimen table.
+
+  Terms in the body face, small and letterspaced; values in Fraunces so the
+  numeral is the thing the eye lands on. Hairlines rather than boxes — the
+  rows are separated by the rules between them, not by containers around them.
+*/
+const DONATION_RULES = [
+  {
+    term: "One donation helps",
+    qualifier: "up to",
+    value: "3",
+    unit: "patients",
+  },
+  { term: "Between donations", qualifier: null, value: "56", unit: "days" },
+  {
+    term: "A screening stays valid",
+    qualifier: null,
+    value: "24",
+    unit: "hours",
+  },
+] as const;
+
+function ImpactLedger() {
   return (
-    <div className="space-y-3">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
-            Donor overview
-          </p>
-
-          <h3 className="mt-1 text-base font-bold text-slate-950">
-            Your donation profile
-          </h3>
-
-          <p className="mt-0.5 text-[11px] text-slate-500">
-            You are currently eligible for your next donation.
-          </p>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-700">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-          </span>
-
-          Eligible
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2.5">
-        <DonorStatCard
-          title="Blood group"
-          value="O+"
-          description="High demand"
-          icon={<BloodDropSmallIcon />}
-        />
-
-        <DonorStatCard
-          title="Donations"
-          value="6"
-          description="Completed"
-          icon={<HeartIcon />}
-        />
-
-        <DonorStatCard
-          title="Lives impacted"
-          value="18"
-          description="Estimated"
-          icon={<PeopleIcon />}
-        />
-      </div>
-
-      <div className="grid gap-2.5 xl:grid-cols-[1.15fr_0.85fr]">
-        <UpcomingAppointmentCard />
-        <DonationMilestoneCard />
-      </div>
-
-      <RecentDonationCard />
-    </div>
-  );
-}
-
-function DonorStatCard({
-  title,
-  value,
-  description,
-  icon,
-}: {
-  title: string;
-  value: string;
-  description: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="group rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400">
-            {title}
-          </p>
-
-          <p className="mt-1.5 text-xl font-bold text-slate-950">
-            {value}
-          </p>
-        </div>
-
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-red-950/5 text-red-950">
-          {icon}
-        </div>
-      </div>
-
-      <p className="mt-1 text-[9px] font-medium text-slate-500">
-        {description}
-      </p>
-    </div>
-  );
-}
-
-function UpcomingAppointmentCard() {
-  return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3.5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[8px] font-bold uppercase tracking-[0.14em] text-slate-400">
-            Upcoming appointment
-          </p>
-
-          <p className="mt-2 text-sm font-bold text-slate-950">
-            14 August 2026
-          </p>
-
-          <div className="mt-2 space-y-1.5">
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-              <ClockIcon />
-              <span>10:30 AM</span>
-            </div>
-
-            <div className="flex items-center gap-2 text-[11px] font-medium text-slate-700">
-              <LocationIcon />
-              <span>Dispensaire Odza</span>
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            backgroundColor: PRIMARY_RED,
-          }}
-          className="shrink-0 rounded-xl px-3 py-2 text-center text-white shadow-md shadow-red-950/20"
-        >
-          <p className="text-lg font-bold leading-none">
-            14
-          </p>
-
-          <p className="mt-1 text-[8px] font-semibold uppercase tracking-wide">
-            Aug
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-        <div>
-          <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400">
-            Next eligible date
-          </p>
-
-          <p className="mt-1 text-[11px] font-bold text-slate-800">
-            18 September 2026
-          </p>
-        </div>
-
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-950/5 text-red-950">
-          <CalendarIcon />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DonationMilestoneCard() {
-  return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-3.5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[8px] font-bold uppercase tracking-[0.14em] text-slate-400">
-            Donation milestone
-          </p>
-
-          <p className="mt-1 text-[10px] text-slate-500">
-            Your progress
-          </p>
-        </div>
-
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-950/10 text-red-950">
-          <BloodDropSmallIcon />
-        </div>
-      </div>
-
-      <div className="mt-3">
-        <div className="flex items-end justify-between gap-2">
-          <div>
-            <p className="text-xl font-bold leading-none text-slate-950">
-              6 of 10
-            </p>
-
-            <p className="mt-1.5 text-[9px] leading-4 text-slate-500">
-              Four more donations to reach your next milestone.
-            </p>
-          </div>
-
-          <span className="text-[11px] font-bold text-red-950">
-            60%
-          </span>
-        </div>
-
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+    <>
+      <dl className="mt-9 border-t border-white/15">
+        {DONATION_RULES.map((rule, index) => (
           <div
+            key={rule.term}
+            /*
+            The final row carries no rule of its own: the heartbeat below is
+            its rule, so the ledger ends by coming alive rather than by
+            closing with one more hairline.
+          */
+            className={`flex items-baseline justify-between gap-6 py-4 ${
+              index === DONATION_RULES.length - 1
+                ? ""
+                : "border-b border-white/15"
+            }`}
             style={{
-              width: "60%",
-              backgroundColor: PRIMARY_RED,
+              animation: "var(--animate-fade)",
+              animationDelay: `${260 + index * 70}ms`,
             }}
-            className="h-full rounded-full"
-          />
-        </div>
-      </div>
+          >
+            <dt className="text-[11px] font-semibold tracking-[0.16em] text-[var(--panel-text-dim)] uppercase">
+              {rule.term}
+            </dt>
 
-      <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2">
-        <p className="text-[9px] font-semibold text-amber-700">
-          Next reward: Silver donor badge
-        </p>
-      </div>
-    </div>
+            <dd className="flex shrink-0 items-baseline gap-1.5">
+              {rule.qualifier ? (
+                <span className="text-[13px] text-[var(--panel-text)]">
+                  {rule.qualifier}
+                </span>
+              ) : null}
+
+              <span className="font-display text-[30px] leading-none font-semibold tracking-[-0.02em] text-white tabular-nums">
+                {rule.value}
+              </span>
+
+              <span className="text-[13px] text-[var(--panel-text)]">
+                {rule.unit}
+              </span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      {/* A sibling of the list, not a child: <dl> takes dt, dd and div only. */}
+      <Heartbeat />
+    </>
   );
 }
 
-function RecentDonationCard() {
+/*
+  The ledger's closing rule, alive. One authored moment for the panel: the
+  line draws itself left to right, and the point it arrives at keeps beating.
+  Both stop under prefers-reduced-motion, which globals.css enforces globally.
+*/
+function Heartbeat() {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-white px-3.5 py-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-          <CheckIcon />
-        </div>
+    <svg
+      viewBox="0 0 520 34"
+      className="h-[34px] w-full overflow-visible"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M0 17 H188 l11 -1.5 l9 3.5 l10 -13 l11 26 l10 -17 l9 2 H520"
+        stroke="var(--color-gold)"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={
+          {
+            "--dash": "600",
+            strokeDasharray: 600,
+            animation: "var(--animate-draw-line)",
+            animationDelay: "480ms",
+          } as React.CSSProperties
+        }
+      />
 
-        <div className="min-w-0">
-          <p className="text-[8px] font-bold uppercase tracking-[0.14em] text-slate-400">
-            Recent donation
-          </p>
+      <circle cx="520" cy="17" r="3" fill="var(--color-gold)" />
 
-          <p className="mt-1 text-[11px] font-bold text-slate-800">
-            12 May 2026 at Dispensaire Odza
-          </p>
-        </div>
-      </div>
-
-      <div className="shrink-0 text-right">
-        <p className="text-[10px] font-bold text-emerald-700">
-          Completed successfully
-        </p>
-
-        <p className="mt-0.5 text-[8px] text-slate-400">
-          Thank you for donating
-        </p>
-      </div>
-    </div>
+      <circle
+        cx="520"
+        cy="17"
+        r="3"
+        fill="var(--color-gold)"
+        style={{
+          animation: "var(--animate-beacon)",
+          animationDelay: "1.9s",
+          transformOrigin: "520px 17px",
+        }}
+      />
+    </svg>
   );
 }
 
@@ -754,39 +696,6 @@ function ErrorIcon() {
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v6" />
       <path d="M12 17h.01" />
-    </svg>
-  );
-}
-
-function HeartIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <path d="M20.8 5.7a5.3 5.3 0 0 0-7.5 0L12 7l-1.3-1.3a5.3 5.3 0 0 0-7.5 7.5L12 22l8.8-8.8a5.3 5.3 0 0 0 0-7.5Z" />
-    </svg>
-  );
-}
-
-function PeopleIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <circle cx="9" cy="8" r="3" />
-      <circle cx="17" cy="9" r="2.5" />
-      <path d="M3.5 20c.4-4 2.3-6 5.5-6s5.1 2 5.5 6" />
-      <path d="M14 15c3.8-.8 6.1 1 6.5 5" />
     </svg>
   );
 }
@@ -883,78 +792,10 @@ function DecorativeBackground() {
         style={{ animation: "var(--animate-drift)", animationDelay: "-7s" }}
       />
 
-      <div className="absolute top-[12%] right-[10%] h-[200px] w-[200px] rounded-full border border-white/[0.06]" />
+      {/* Deepens the corners so the headline sits on the darkest part of the
+          gradient rather than on a drift glow passing behind it. */}
+      <div className="absolute inset-0 bg-[radial-gradient(120%_90%_at_50%_45%,transparent_35%,oklch(19%_0.085_8/0.55)_100%)]" />
     </div>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-3.5 w-3.5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5h4" />
-    </svg>
-  );
-}
-
-function LocationIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-3.5 w-3.5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <path d="M12 21s8-4.5 8-11a8 8 0 1 0-16 0c0 6.5 8 11 8 11Z" />
-      <circle cx="12" cy="10" r="2.5" />
-    </svg>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <rect
-        x="4"
-        y="4"
-        width="16"
-        height="16"
-        rx="3"
-      />
-
-      <path d="M16 2v4M8 2v4M4 10h16" />
-    </svg>
-  );
-}
-
-function BloodDropSmallIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-3.5 w-3.5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <path d="M12 3.5c2.8 3.8 7 8.9 7 12.5a7 7 0 1 1-14 0c0-3.6 4.2-8.7 7-12.5Z" />
-    </svg>
   );
 }
 

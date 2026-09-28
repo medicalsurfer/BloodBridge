@@ -395,7 +395,7 @@ export default function PrivacyPolicyPage() {
                   Your first {DONATIONS_PER_CONSULTATION} donations earn a free consultation.
                 </h2>
 
-                <p className="mt-3 max-w-[520px] text-[13.5px] leading-6 text-red-100/80">
+                <p className="mt-3 max-w-[520px] text-[13.5px] leading-6 on-garnet">
                   Create a donor account and BloodBridge will track the count for you.
                 </p>
 
@@ -449,12 +449,12 @@ function Hero() {
           How BloodBridge handles your data — and what you are owed for donating.
         </h1>
 
-        <p className="mt-5 max-w-[620px] text-[15px] leading-7 text-red-100/80">
+        <p className="mt-5 max-w-[620px] text-[15px] leading-7 on-garnet">
           The information we hold, who may see it, the rights you hold over it, and the
           commitments every participating health institute makes to its donors.
         </p>
 
-        <p className="mt-6 font-mono text-[12px] text-red-100/65">
+        <p className="mt-6 font-mono text-[12px] on-garnet-dim">
           Effective {LAST_UPDATED}
         </p>
       </div>

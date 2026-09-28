@@ -1,8 +1,28 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Fragment, useEffect, useRef, useState } from "react";
 import styles from "./AssistantWidget.module.css";
+
+/*
+  Pages the assistant stays off.
+
+  These are the public face of BloodBridge — the ones someone reads before
+  they have an account, or while signing in. A signed-in person visiting the
+  landing page is still on a marketing page, so the widget hides there too:
+  the assistant belongs to the application, not to the shopfront.
+*/
+const PUBLIC_ROUTES = [
+  "/",
+  "/landing",
+  "/login",
+  "/register",
+  "/privacy",
+  "/terms",
+  "/forgot-password",
+  "/reset-password",
+];
 
 type ChatMessage = {
   id: string;
@@ -22,6 +42,21 @@ type AuthUser = {
     appointmentTime: string;
     healthInstitute: { name: string };
   } | null;
+  /** Staff and admins: the institute they work for. */
+  institute: { name: string; city: string } | null;
+  /** Lab technicians only: the two figures their shift turns on. */
+  labSnapshot: {
+    lowestStock: { bloodGroup: string; units: number } | null;
+    awaitingRecord: number;
+  } | null;
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  DONOR: "Donor",
+  MEDICAL_STAFF: "Medical staff",
+  LAB_TECHNICIAN: "Lab technician",
+  HEALTH_INSTITUTE_ADMIN: "Institute admin",
+  SYSTEM_ADMIN: "System admin",
 };
 
 const SUGGESTIONS_BY_ROLE: Record<string, string[]> = {
@@ -31,10 +66,31 @@ const SUGGESTIONS_BY_ROLE: Record<string, string[]> = {
     "How do rewards work?",
     "How do I book a donation?",
   ],
-  MEDICAL_STAFF: ["How do I create a blood request?", "How do I find eligible donors?"],
-  LAB_TECHNICIAN: ["How do I record a donation?", "What do the AI recommendations mean?"],
-  HEALTH_INSTITUTE_ADMIN: ["How do I invite staff?", "How do I validate a donation reward?"],
-  SYSTEM_ADMIN: ["How do I manage health institutes?", "Where can I see the audit logs?"],
+  /*
+    Staff prompts lead with questions the assistant can answer from live
+    figures, because it now reads the institute's own stock, requests and
+    donor counts. The how-to questions follow.
+  */
+  MEDICAL_STAFF: [
+    "What blood do we need most right now?",
+    "How many donors can donate today?",
+    "How do I create a blood request?",
+  ],
+  LAB_TECHNICIAN: [
+    "Which blood group is running low?",
+    "What is waiting for a donation record?",
+    "How do I record a donation?",
+  ],
+  HEALTH_INSTITUTE_ADMIN: [
+    "What is our blood stock right now?",
+    "How do I invite staff?",
+    "How do I validate a donation reward?",
+  ],
+  SYSTEM_ADMIN: [
+    "How many institutes are active?",
+    "How many donors are registered?",
+    "Where can I see the audit logs?",
+  ],
 };
 
 /** Ids and timestamps for the optimistic pair, created outside render. */
@@ -60,13 +116,19 @@ export function AssistantWidget() {
   const msgsRef = useRef<HTMLDivElement>(null);
   const draftRef = useRef<HTMLTextAreaElement>(null);
 
+  const pathname = usePathname();
+  const onPublicPage = PUBLIC_ROUTES.includes(pathname);
+
   useEffect(() => {
+    // Nothing to ask on a page the assistant will not appear on.
+    if (onPublicPage) return;
+
     fetch("/api/auth/me", { credentials: "include", cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => setUser(data?.user ?? null))
       .catch(() => setUser(null))
       .finally(() => setCheckedAuth(true));
-  }, []);
+  }, [onPublicPage]);
 
   useEffect(() => {
     if (!open || historyLoaded || !user) return;
@@ -100,7 +162,7 @@ export function AssistantWidget() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  if (!checkedAuth || !user) return null;
+  if (onPublicPage || !checkedAuth || !user) return null;
 
   async function send(text: string) {
     const content = text.trim();
@@ -266,23 +328,48 @@ export function AssistantWidget() {
                   </p>
                 </div>
               ) : (
-                messages.map((message) =>
-                  message.role === "ASSISTANT" && !message.content ? null : (
-                    <div
-                      key={message.id}
-                      className={`${styles.msg} ${message.role === "USER" ? styles.msgUser : styles.msgBot}`}
-                    >
-                      {message.role === "ASSISTANT" ? <ReplyText text={message.content} /> : message.content}
+                messages.map((message, index) => {
+                  if (message.role === "USER") {
+                    return (
+                      <div key={message.id} className={`${styles.msg} ${styles.msgUser}`}>
+                        {message.content}
+                      </div>
+                    );
+                  }
+
+                  if (!message.content) return null;
+
+                  // The last reply is the one still arriving, so it carries
+                  // the cursor until the stream finishes.
+                  const streaming = sending && index === messages.length - 1;
+
+                  return (
+                    <div key={message.id} className={styles.botRow}>
+                      <span className={styles.botAvatar} aria-hidden>
+                        <AssistantMark />
+                      </span>
+
+                      <div className={`${styles.msg} ${styles.msgBot} ${styles.botBody}`}>
+                        <ReplyText text={message.content} />
+                        {streaming && <span className={styles.cursor} aria-hidden />}
+                      </div>
                     </div>
-                  ),
-                )
+                  );
+                })
               )}
 
               {awaitingFirstToken && (
-                <div className={styles.typing} aria-label="The assistant is typing">
-                  <span />
-                  <span />
-                  <span />
+                /* Waiting sits where the reply will appear, behind the same avatar. */
+                <div className={styles.botRow}>
+                  <span className={styles.botAvatar} aria-hidden>
+                    <AssistantMark />
+                  </span>
+
+                  <div className={styles.typing} aria-label="The assistant is typing">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
                 </div>
               )}
             </div>
@@ -376,6 +463,55 @@ export function AssistantWidget() {
               </div>
             )}
 
+            {/*
+              The same column, for everyone who is not a donor. It used to
+              render nothing at all for staff, which made the assistant look
+              like it was not meant for them.
+            */}
+            {user.role !== "DONOR" && (
+              <div>
+                <div className={styles.infoLabel}>Your workspace</div>
+                <div className={styles.infoStats}>
+                  <div className={styles.infoStat}>
+                    <div className={styles.infoStatLabel}>Signed in as</div>
+                    <div className={styles.infoStatValueSmall}>
+                      {ROLE_LABELS[user.role] ?? user.role}
+                    </div>
+                  </div>
+
+                  {user.institute && (
+                    <div className={styles.infoStat}>
+                      <div className={styles.infoStatLabel}>Institute</div>
+                      <div className={styles.infoStatValueSmall}>
+                        {user.institute.name} · {user.institute.city}
+                      </div>
+                    </div>
+                  )}
+
+                  {user.labSnapshot?.lowestStock && (
+                    <div className={styles.infoStat}>
+                      <div className={styles.infoStatLabel}>Lowest stock</div>
+                      <div className={styles.infoStatValue}>
+                        {user.labSnapshot.lowestStock.bloodGroup}{" "}
+                        <span className={styles.infoStatValueSmall}>
+                          {user.labSnapshot.lowestStock.units} units
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {user.labSnapshot && user.labSnapshot.awaitingRecord > 0 && (
+                    <div className={styles.infoStat}>
+                      <div className={styles.infoStatLabel}>Awaiting a record</div>
+                      <div className={styles.infoStatValue}>
+                        {user.labSnapshot.awaitingRecord}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {suggestions.length > 0 && (
               <div>
                 <div className={styles.infoLabel}>Ask about</div>
@@ -404,6 +540,15 @@ export function AssistantWidget() {
 // Replies are plain text; render **bold** and turn in-app paths like
 // "(/profile)" into links so the assistant can point people to pages.
 const REPLY_TOKEN = /(\*\*[^*]+\*\*|(?<![\w/])\/[a-z][a-z0-9-]*(?:\/[a-z0-9-]+)*)/g;
+
+/** The drop that marks an assistant turn, small enough for a 27px avatar. */
+function AssistantMark() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 2.5c3.6 4.2 6.5 7.7 6.5 11.1A6.5 6.5 0 0 1 12 20a6.5 6.5 0 0 1-6.5-6.4c0-3.4 2.9-6.9 6.5-11.1Z" />
+    </svg>
+  );
+}
 
 function ReplyText({ text }: { text: string }) {
   return (

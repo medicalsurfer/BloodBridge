@@ -1020,7 +1020,7 @@ function PreparationItem({
         <CheckSmallIcon />
       </div>
 
-      <p className="text-xs leading-5 text-red-100/90">
+      <p className="text-xs leading-5 on-garnet">
         {text}
       </p>
     </div>
