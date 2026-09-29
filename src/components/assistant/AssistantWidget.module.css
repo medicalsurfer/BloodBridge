@@ -407,6 +407,106 @@
   color: var(--bb-text-muted);
 }
 
+/* ── past conversations ─────────────────────────────────────────────── */
+
+.headBtnActive {
+  background: var(--bb-surface-2);
+  color: var(--bb-accent);
+}
+.history {
+  flex: 1;
+  min-height: 0;
+  padding: 16px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  background: var(--bb-chat-canvas);
+  scrollbar-width: thin;
+  scrollbar-color: var(--bb-border) transparent;
+}
+.historyHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+.historyNew {
+  border: 1px solid var(--bb-border);
+  background: var(--bb-surface);
+  color: var(--bb-text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.historyNew:hover {
+  border-color: var(--bb-accent);
+  color: var(--bb-accent);
+}
+.historyNew:focus-visible {
+  outline: 2px solid var(--bb-focus);
+  outline-offset: 2px;
+}
+.historyList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.historyItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--bb-border);
+  border-radius: 12px;
+  background: var(--bb-surface);
+  padding-right: 6px;
+}
+.historyOpen {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  color: var(--bb-text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.historyOpen:hover .historyTitle {
+  color: var(--bb-accent);
+}
+.historyOpen:focus-visible {
+  outline: 2px solid var(--bb-focus);
+  outline-offset: 2px;
+}
+.historyCurrent .historyTitle {
+  color: var(--bb-accent);
+}
+.historyTitle {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+.historyMeta {
+  font-size: 11px;
+  color: var(--bb-text-muted);
+}
+
 /* ── suggestions ────────────────────────────────────────────────────── */
 
 .suggested {
@@ -584,5 +684,308 @@
     width: 52px;
     padding: 0;
     justify-content: center;
+  }
+}
+
+/*
+  ─────────────────────────────────────────────────────────────────────────
+  Playful skin.
+
+  The assistant has a face now (the Mascot in AssistantWidget.tsx), and the
+  panel is built around it: a garnet-to-plum header it sits in, bubbles on
+  both sides so it reads as a conversation, chips in the brand family's
+  colours, and small moments of motion — a blink, a hop, a pop — that make it
+  feel alive without getting in the way. Everything still reads the shell
+  tokens, so it works in both themes.
+  ─────────────────────────────────────────────────────────────────────────
+*/
+
+/* ── mascot ── */
+.mascot {
+  display: block;
+  overflow: visible;
+}
+.mascotEyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bbBlink 4.6s infinite;
+}
+@keyframes bbBlink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+.mascotThinking {
+  animation: bbBob 0.9s var(--ease-in-out-soft) infinite;
+}
+@keyframes bbBob {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-3px) rotate(4deg); }
+}
+
+/* ── launcher: a white pill the mascot peeks out of ── */
+.launcher {
+  height: 58px;
+  padding: 0 20px 0 10px;
+  background: var(--bb-surface);
+  color: var(--bb-accent);
+  border: 1px solid color-mix(in oklch, oklch(70% 0.15 15) 35%, var(--bb-border));
+  box-shadow:
+    0 2px 4px oklch(40% 0.1 14 / 0.08),
+    0 18px 38px -14px oklch(45% 0.16 14 / 0.5);
+  font-size: 14px;
+}
+.launcher:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 2px 4px oklch(40% 0.1 14 / 0.08),
+    0 24px 44px -14px oklch(45% 0.16 14 / 0.6);
+}
+.launcher:hover .mascot {
+  animation: bbHop 0.6s var(--ease-out-expo, ease-out);
+}
+@keyframes bbHop {
+  0% { transform: translateY(0) scale(1); }
+  35% { transform: translateY(-6px) scale(1.06, 0.96); }
+  70% { transform: translateY(0) scale(0.97, 1.03); }
+  100% { transform: none; }
+}
+.icChat {
+  display: flex;
+}
+.launcher.isOpen {
+  width: 58px;
+  background: linear-gradient(135deg, oklch(52% 0.19 17), oklch(34% 0.13 355));
+  color: #fff;
+  border-color: transparent;
+}
+
+/* ── panel ── */
+.panel {
+  border-radius: 24px;
+  border-color: color-mix(in oklch, oklch(70% 0.15 15) 25%, var(--bb-border));
+  box-shadow:
+    0 2px 6px oklch(40% 0.1 14 / 0.08),
+    0 30px 70px -20px oklch(40% 0.16 14 / 0.45);
+  transform-origin: bottom right;
+}
+
+/* ── header: the band the mascot sits in ── */
+.head {
+  position: relative;
+  padding: 14px 14px 14px 16px;
+  border-bottom: 0;
+  background:
+    radial-gradient(120% 140% at 0% 0%, oklch(62% 0.2 20 / 0.9), transparent 55%),
+    linear-gradient(135deg, oklch(48% 0.19 16), oklch(33% 0.13 355));
+  color: #fff;
+}
+.headIcon {
+  width: 44px;
+  height: 44px;
+  background: #fff;
+  box-shadow: 0 6px 16px -6px oklch(20% 0.1 12 / 0.6);
+}
+.headStatus {
+  border-color: #fff;
+  width: 11px;
+  height: 11px;
+}
+.headTitle {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.headSub {
+  color: oklch(92% 0.04 14);
+  font-size: 11.5px;
+}
+.head .headBtn {
+  color: oklch(94% 0.03 14);
+}
+.head .headBtn:hover {
+  background: oklch(100% 0 0 / 0.16);
+  color: #fff;
+}
+.head .headBtn:focus-visible {
+  outline-color: #fff;
+}
+.head .headBtnActive {
+  background: oklch(100% 0 0 / 0.2);
+  color: #fff;
+}
+
+/* ── conversation canvas: blush with a faint scatter of drops ── */
+.msgs {
+  gap: 14px;
+  padding: 20px 14px 10px;
+  background-color: var(--bb-chat-canvas);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22120%22 viewBox=%220 0 120 120%22%3E%3Cg fill=%22%23b3263f%22 fill-opacity=%220.06%22%3E%3Cpath d=%22M20 10c3 4 6 7.5 6 10.5a6 6 0 0 1-12 0C14 17.5 17 14 20 10Z%22/%3E%3Cpath d=%22M86 58c2 2.7 4 5 4 7a4 4 0 0 1-8 0c0-2 2-4.3 4-7Z%22/%3E%3Cpath d=%22M44 92c2.4 3.2 4.8 6 4.8 8.4a4.8 4.8 0 0 1-9.6 0c0-2.4 2.4-5.2 4.8-8.4Z%22/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Messages pop in from the side they belong to. */
+@keyframes bbPopUser {
+  from { opacity: 0; transform: translateY(8px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes bbPopBot {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+.msgUser {
+  padding: 10px 14px;
+  border-radius: 20px 20px 6px 20px;
+  background: linear-gradient(135deg, oklch(52% 0.19 17), oklch(36% 0.14 8));
+  color: #fff;
+  box-shadow: 0 8px 18px -10px oklch(45% 0.18 15 / 0.7);
+  transform-origin: bottom right;
+  animation: bbPopUser 0.32s var(--ease-out-expo, ease-out) both;
+}
+
+.botRow {
+  gap: 9px;
+  align-items: flex-end;
+  animation: bbPopBot 0.34s var(--ease-out-expo, ease-out) both;
+  transform-origin: bottom left;
+}
+.botAvatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--bb-surface);
+  box-shadow: 0 4px 10px -4px oklch(40% 0.12 14 / 0.45);
+}
+.msgBot {
+  align-self: auto;
+  max-width: calc(100% - 44px);
+  padding: 11px 14px;
+  border-radius: 20px 20px 20px 6px;
+  background: var(--bb-surface);
+  border: 1px solid color-mix(in oklch, oklch(75% 0.1 14) 22%, var(--bb-border));
+  box-shadow: 0 8px 22px -16px oklch(40% 0.12 14 / 0.55);
+}
+.msgBot strong {
+  color: var(--bb-accent-strong, var(--bb-accent));
+}
+
+/* Thinking: three bouncing dots in the brand family, in a bubble. */
+.typingBubble {
+  height: auto;
+  padding: 12px 14px;
+  border-radius: 20px 20px 20px 6px;
+  background: var(--bb-surface);
+  border: 1px solid color-mix(in oklch, oklch(75% 0.1 14) 22%, var(--bb-border));
+}
+.typingBubble span {
+  width: 8px;
+  height: 8px;
+  opacity: 1;
+  animation: bbRiseDot 1s var(--ease-in-out-soft) infinite;
+}
+.typingBubble span:nth-child(1) { background: oklch(60% 0.2 15); }
+.typingBubble span:nth-child(2) { background: oklch(52% 0.16 345); animation-delay: 0.14s; }
+.typingBubble span:nth-child(3) { background: oklch(70% 0.15 50); animation-delay: 0.28s; }
+@keyframes bbRiseDot {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-6px); }
+}
+
+/* ── opening state: the mascot says hello ── */
+.introMascot {
+  display: inline-block;
+  animation: bbWave 2.8s var(--ease-in-out-soft) 0.3s infinite;
+  filter: drop-shadow(0 10px 14px oklch(45% 0.16 14 / 0.35));
+}
+@keyframes bbWave {
+  0%, 60%, 100% { transform: rotate(0deg) translateY(0); }
+  10% { transform: rotate(-8deg) translateY(-4px); }
+  20% { transform: rotate(7deg) translateY(-4px); }
+  30% { transform: rotate(-4deg) translateY(0); }
+}
+.introTitle {
+  margin-top: 10px;
+  font-size: 22px;
+}
+
+/* ── suggestions: each chip a different colour from the brand family ── */
+.suggested {
+  gap: 8px;
+  padding: 11px 14px;
+}
+.suggestedChip {
+  --h: 12;
+  border-color: color-mix(in oklch, oklch(72% 0.12 var(--h)) 45%, var(--bb-border));
+  background: color-mix(in oklch, oklch(88% 0.08 var(--h)) 30%, var(--bb-surface));
+  color: var(--bb-text);
+  padding: 8px 14px;
+  transition: transform 0.2s var(--ease-out-expo, ease-out), border-color 0.15s ease, background 0.15s ease;
+}
+.suggestedChip:nth-child(4n + 2) { --h: 345; }
+.suggestedChip:nth-child(4n + 3) { --h: 50; }
+.suggestedChip:nth-child(4n + 4) { --h: 150; }
+.suggestedChip:hover {
+  transform: translateY(-2px);
+  color: var(--bb-text);
+  border-color: oklch(62% 0.15 var(--h));
+  background: color-mix(in oklch, oklch(88% 0.1 var(--h)) 55%, var(--bb-surface));
+}
+
+/* ── composer ── */
+.inputRow {
+  padding: 12px;
+  border-top-color: color-mix(in oklch, oklch(75% 0.1 14) 22%, var(--bb-border));
+}
+.inputRow textarea {
+  border-radius: 22px;
+  padding: 11px 16px;
+  font-size: 13.5px;
+  transition: border-color 0.15s ease, box-shadow 0.2s ease;
+}
+.inputRow textarea:focus-visible {
+  border-color: oklch(55% 0.18 15);
+  box-shadow: 0 0 0 4px oklch(62% 0.18 15 / 0.16);
+}
+.send {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, oklch(56% 0.2 18), oklch(36% 0.14 355));
+  color: #fff;
+  box-shadow: 0 8px 18px -8px oklch(45% 0.18 15 / 0.75);
+  transition: transform 0.22s var(--ease-out-expo, ease-out), opacity 0.15s ease;
+}
+.send:hover:not(:disabled) {
+  transform: rotate(-14deg) scale(1.07);
+}
+.send:active:not(:disabled) {
+  transform: translateX(3px) rotate(-14deg) scale(0.94);
+}
+
+@media (max-width: 720px) {
+  .launcher {
+    width: 58px;
+    padding: 0;
+  }
+}
+
+/* Five header controls leave the title a narrow column: keep it to one line. */
+.head .headTitle {
+  font-size: 14.5px;
+}
+.headTitle,
+.headSub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.head .headActions {
+  gap: 0;
+}
+
+/* On a phone the panel is already full width; expanding does nothing, so the
+   button gives its space back to the title. */
+@media (max-width: 720px) {
+  .expandBtn {
+    display: none;
   }
 }

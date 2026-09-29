@@ -139,6 +139,7 @@ model User {
   donorConversations Conversation[]   @relation("DonorConversations")
   messages           Message[]
   aiChatMessages     AiChatMessage[]
+  aiConversations    AiConversation[]
   passwordResetTokens PasswordResetToken[]
   eligibilityAssessments EligibilityAssessment[]
 
@@ -161,17 +162,35 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
-model AiChatMessage {
-  id        String     @id @default(cuid())
+/// One assistant chat. A user keeps many and can reopen any of them.
+model AiConversation {
+  id        String   @id @default(cuid())
   userId    String
-  role      AiChatRole
-  content   String
-  createdAt DateTime   @default(now())
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AiChatMessage[]
+
+  @@index([userId, updatedAt])
+  @@map("ai_conversations")
+}
+
+model AiChatMessage {
+  id             String     @id @default(cuid())
+  userId         String
+  conversationId String
+  role           AiChatRole
+  content        String
+  createdAt      DateTime   @default(now())
+
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, createdAt])
+  @@index([conversationId, createdAt])
   @@map("ai_chat_messages")
 }
 

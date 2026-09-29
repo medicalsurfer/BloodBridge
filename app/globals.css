@@ -237,8 +237,8 @@
 }
 
 :root {
-  --background: oklch(99% 0.003 30);
-  --foreground: oklch(21% 0.012 30);
+  --background: oklch(97.8% 0.011 14);
+  --foreground: oklch(21% 0.014 14);
 }
 
 :root {
@@ -341,11 +341,13 @@ table {
   classes (bg-slate-100, text-slate-950, etc.) do not read these.
 */
 :root {
-  --bb-bg: oklch(98% 0.004 30);
-  --bb-sidebar: oklch(99.2% 0.003 30);
+  /* Blush paper: the page carries a breath of the brand hue, so white cards
+     lift off it instead of sitting on the same flat off-white. */
+  --bb-bg: oklch(97.8% 0.011 14);
+  --bb-sidebar: oklch(99.4% 0.005 14);
   --bb-surface: oklch(100% 0 0);
-  --bb-surface-2: oklch(96% 0.006 30);
-  --bb-border: oklch(90% 0.008 30);
+  --bb-surface-2: oklch(96.4% 0.013 14);
+  --bb-border: oklch(90.5% 0.017 14);
   --bb-text: oklch(22% 0.015 30);
   --bb-text-muted: oklch(50% 0.012 30);
   /* 4.88:1 on white — WCAG AA for small text. Do not lighten past 56%. */
@@ -394,20 +396,27 @@ table {
   survives hydration), or they have chosen nothing and their system asks for
   dark. Choosing light always wins over the system.
 */
+/*
+  "Garnet night". The dark neutrals are not grey: they are the brand garnet
+  (hue 12) taken almost to black, with chroma falling away as lightness rises,
+  so surfaces read as deep wine while text stays clean and near-white. Contrast
+  is kept to the light theme's floors: slate-400 on slate-50 is 6.9:1, the
+  faint text on a card 7.6:1.
+*/
 :root {
-  --dk--background: oklch(14% 0.008 30);
-  --dk--foreground: oklch(95% 0.004 30);
-  --dk--color-slate-50: oklch(19.5% 0.008 30);
-  --dk--color-slate-100: oklch(23% 0.009 30);
-  --dk--color-slate-200: oklch(38% 0.011 30);
-  --dk--color-slate-300: oklch(52% 0.013 30);
-  --dk--color-slate-400: oklch(67% 0.013 30);
-  --dk--color-slate-500: oklch(74% 0.012 30);
-  --dk--color-slate-600: oklch(80% 0.011 30);
-  --dk--color-slate-700: oklch(86% 0.009 30);
-  --dk--color-slate-800: oklch(91% 0.007 30);
-  --dk--color-slate-900: oklch(95% 0.005 30);
-  --dk--color-slate-950: oklch(98% 0.003 30);
+  --dk--background: oklch(14.5% 0.024 12);
+  --dk--foreground: oklch(95.5% 0.006 12);
+  --dk--color-slate-50: oklch(19.5% 0.027 12);
+  --dk--color-slate-100: oklch(23.5% 0.03 12);
+  --dk--color-slate-200: oklch(37% 0.032 12);
+  --dk--color-slate-300: oklch(51% 0.029 12);
+  --dk--color-slate-400: oklch(67% 0.024 12);
+  --dk--color-slate-500: oklch(74% 0.02 12);
+  --dk--color-slate-600: oklch(80.5% 0.016 12);
+  --dk--color-slate-700: oklch(86.5% 0.012 12);
+  --dk--color-slate-800: oklch(91% 0.009 12);
+  --dk--color-slate-900: oklch(95% 0.006 12);
+  --dk--color-slate-950: oklch(98% 0.004 12);
   --dk--color-red-50: oklch(26% 0.045 12.094);
   --dk--color-red-100: oklch(30% 0.06 12.094);
   --dk--color-red-200: oklch(37% 0.085 12.094);
@@ -439,21 +448,22 @@ table {
   --dk--color-purple-700: oklch(80% 0.11 310);
   --dk--color-orange-50: oklch(26% 0.045 48);
   --dk--color-orange-700: oklch(80% 0.13 48);
-  --dk--shadow-sm: 0 1px 2px 0 oklch(0% 0 0 / 0.5);
-  --dk--shadow-md: 0 2px 6px -1px oklch(0% 0 0 / 0.55);
-  --dk--shadow-lg: 0 6px 16px -4px oklch(0% 0 0 / 0.6);
-  --dk--shadow-xl: 0 12px 32px -8px oklch(0% 0 0 / 0.65);
-  --dk--bb-bg: oklch(14% 0.008 30);
-  --dk--bb-sidebar: oklch(18% 0.009 30);
-  --dk--bb-surface: oklch(22% 0.009 30);
-  --dk--bb-surface-2: oklch(27% 0.01 30);
-  --dk--bb-border: oklch(45% 0.013 30);
-  --dk--bb-text: oklch(95% 0.004 30);
-  --dk--bb-text-muted: oklch(78% 0.011 30);
-  --dk--bb-text-faint: oklch(72% 0.012 30);
-  --dk--bb-accent: oklch(45% 0.15 12.094);
-  --dk--bb-accent-strong: oklch(55% 0.17 12.094);
-  --dk--bb-accent-soft: oklch(30% 0.06 12.094);
+  /* Shadows in the dark carry a little of the garnet, so depth reads warm. */
+  --dk--shadow-sm: 0 1px 2px 0 oklch(8% 0.03 12 / 0.55);
+  --dk--shadow-md: 0 3px 8px -1px oklch(8% 0.03 12 / 0.6);
+  --dk--shadow-lg: 0 8px 20px -4px oklch(8% 0.04 12 / 0.65);
+  --dk--shadow-xl: 0 16px 40px -8px oklch(8% 0.05 12 / 0.7);
+  --dk--bb-bg: oklch(14.5% 0.024 12);
+  --dk--bb-sidebar: oklch(17.5% 0.03 12);
+  --dk--bb-surface: oklch(21.5% 0.03 12);
+  --dk--bb-surface-2: oklch(26% 0.034 12);
+  --dk--bb-border: oklch(42% 0.036 12);
+  --dk--bb-text: oklch(95.5% 0.006 12);
+  --dk--bb-text-muted: oklch(80% 0.02 12);
+  --dk--bb-text-faint: oklch(73% 0.024 12);
+  --dk--bb-accent: oklch(52% 0.19 16);
+  --dk--bb-accent-strong: oklch(76% 0.13 14);
+  --dk--bb-accent-soft: oklch(31% 0.08 12);
   --dk--bb-on-accent: oklch(99% 0.004 12.094);
   --dk--bb-success: oklch(72% 0.14 155);
   --dk--bb-success-soft: oklch(28% 0.055 155);
@@ -462,8 +472,21 @@ table {
   --dk--bb-high: oklch(74% 0.14 45);
   --dk--bb-high-soft: oklch(29% 0.055 45);
   --dk--bb-high-border: oklch(42% 0.09 45);
-  --dk--bb-shadow: 0 1px 2px oklch(0% 0 0 / 0.5);
-  --dk--bb-shadow-md: 0 10px 28px oklch(0% 0 0 / 0.6);
+  /*
+    Atmosphere: an ember glow high on the left and a plum glow low on the
+    right, both from the brand family, behind every page. Low alpha on a deep
+    ground, so it tints the room without touching text contrast.
+  */
+  --dk--bb-glow:
+    radial-gradient(1100px 680px at -5% -12%, oklch(40% 0.15 18 / 0.3), transparent 62%),
+    radial-gradient(900px 700px at 108% 112%, oklch(36% 0.13 350 / 0.26), transparent 60%);
+  /* Cards catch a little light along their top edge. */
+  --dk--bb-card-sheen: linear-gradient(180deg, oklch(100% 0 0 / 0.035), transparent 45%);
+  /* Primary actions glow: crimson to garnet, white label 5.2:1 at the light end. */
+  --dk--bb-primary-fill: linear-gradient(135deg, oklch(52% 0.19 17), oklch(37% 0.15 6));
+  --dk--bb-primary-glow: 0 8px 22px -10px oklch(58% 0.21 16 / 0.75), inset 0 1px 0 oklch(100% 0 0 / 0.12);
+  --dk--bb-shadow: 0 1px 2px oklch(8% 0.03 12 / 0.55);
+  --dk--bb-shadow-md: 0 12px 32px oklch(8% 0.05 12 / 0.65);
   --dk--bb-focus: oklch(70% 0.13 250);
 }
 
@@ -539,6 +562,10 @@ table {
   --bb-shadow: var(--dk--bb-shadow);
   --bb-shadow-md: var(--dk--bb-shadow-md);
   --bb-focus: var(--dk--bb-focus);
+  --bb-glow: var(--dk--bb-glow);
+  --bb-card-sheen: var(--dk--bb-card-sheen);
+  --bb-primary-fill: var(--dk--bb-primary-fill);
+  --bb-primary-glow: var(--dk--bb-primary-glow);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -614,6 +641,10 @@ table {
   --bb-shadow: var(--dk--bb-shadow);
   --bb-shadow-md: var(--dk--bb-shadow-md);
   --bb-focus: var(--dk--bb-focus);
+  --bb-glow: var(--dk--bb-glow);
+  --bb-card-sheen: var(--dk--bb-card-sheen);
+  --bb-primary-fill: var(--dk--bb-primary-fill);
+  --bb-primary-glow: var(--dk--bb-primary-glow);
   }
 }
 
@@ -694,11 +725,11 @@ table {
   than a box drawn on the same plane.
 */
 :root {
-  --bb-chat-canvas: oklch(96.5% 0.005 30);
+  --bb-chat-canvas: oklch(97% 0.012 14);
 }
 
 [data-theme="dark"] {
-  --bb-chat-canvas: oklch(15% 0.008 30);
+  --bb-chat-canvas: oklch(16% 0.026 12);
 }
 
 .bbChatCanvas {
@@ -880,6 +911,10 @@ table {
     --bb-shadow: var(--dk--bb-shadow);
     --bb-shadow-md: var(--dk--bb-shadow-md);
     --bb-focus: var(--dk--bb-focus);
+    --bb-glow: var(--dk--bb-glow);
+    --bb-card-sheen: var(--dk--bb-card-sheen);
+    --bb-primary-fill: var(--dk--bb-primary-fill);
+    --bb-primary-glow: var(--dk--bb-primary-glow);
   }
 
   :root:not([data-theme="light"]) ::selection {
@@ -951,6 +986,184 @@ table {
 
   :root:not([data-theme="light"]) {
   
-    --bb-chat-canvas: oklch(15% 0.008 30);
+    --bb-chat-canvas: oklch(16% 0.026 12);
   }
+}
+
+/*
+  ─────────────────────────────────────────────────────────────────────────
+  Colour and motion layer.
+
+  The four --bb-glow/sheen/primary tokens are "none" in the light theme and
+  set by the dark arms above, so every rule here is written once and only
+  changes what it paints when the theme asks for it.
+  ─────────────────────────────────────────────────────────────────────────
+*/
+/* :where() keeps these defaults at zero specificity: they sit after the dark
+   theme's arms in this file, and must never outrank them. */
+:where(:root) {
+  /* Daylight version of the atmosphere: rose high on the left, a warm peach
+     low on the right. Pale enough that text never sits on a strong colour. */
+  --bb-glow:
+    radial-gradient(1000px 620px at -6% -14%, oklch(90% 0.06 12 / 0.75), transparent 62%),
+    radial-gradient(900px 680px at 108% 112%, oklch(93% 0.055 62 / 0.7), transparent 60%);
+  --bb-card-sheen: none;
+  --bb-primary-fill: none;
+  --bb-primary-glow: none;
+  /* Cards float on the blush with a warm, soft shadow instead of a grey one. */
+  --bb-card-shadow: 0 1px 2px oklch(40% 0.08 14 / 0.06), 0 12px 32px -20px oklch(40% 0.12 14 / 0.35);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="dark"] {
+  --bb-card-shadow: 0 1px 2px oklch(8% 0.03 12 / 0.5), 0 14px 34px -20px oklch(5% 0.05 12 / 0.8);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bb-card-shadow: 0 1px 2px oklch(8% 0.03 12 / 0.5), 0 14px 34px -20px oklch(5% 0.05 12 / 0.8);
+  }
+}
+
+/*
+  Stat tiles. Each tile in a row takes its own colour from the brand family —
+  garnet, plum, ember, gold — so a row of figures reads as four different
+  things at a glance. A tile's tone (good / warn / critical) overrides the
+  position colour, because state matters more than variety.
+
+  The tint is mixed into the surface colour, so the same rule works in both
+  themes; only the ink changes, lifted in the dark.
+*/
+.bb-tiles > :nth-child(4n + 1) { --h: 12; }
+.bb-tiles > :nth-child(4n + 2) { --h: 345; }
+.bb-tiles > :nth-child(4n + 3) { --h: 45; }
+.bb-tiles > :nth-child(4n + 4) { --h: 78; }
+.bb-tile[data-tone="good"] { --h: 155; }
+.bb-tile[data-tone="warn"] { --h: 70; }
+.bb-tile[data-tone="critical"] { --h: 14; }
+
+.bb-tile {
+  --tile-ink: oklch(42% 0.14 var(--h, 12));
+  --tile-dot: oklch(62% 0.17 var(--h, 12));
+  background:
+    radial-gradient(140% 120% at 100% 0%, color-mix(in oklch, oklch(80% 0.12 var(--h, 12)) 22%, var(--bb-surface)), var(--bb-surface) 62%);
+  border: 1px solid color-mix(in oklch, oklch(75% 0.1 var(--h, 12)) 32%, var(--bb-border));
+  box-shadow: var(--bb-card-shadow);
+  transition: transform 0.3s var(--ease-out-expo), box-shadow 0.3s var(--ease-out-expo);
+}
+
+.bb-tile:hover {
+  transform: translateY(-2px);
+}
+
+[data-theme="dark"] .bb-tile {
+  --tile-ink: oklch(84% 0.1 var(--h, 12));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .bb-tile {
+    --tile-ink: oklch(84% 0.1 var(--h, 12));
+  }
+}
+
+body {
+  background-image: var(--bb-glow);
+  background-attachment: fixed;
+}
+
+.bg-white {
+  background-image: var(--bb-card-sheen);
+}
+
+.bg-red-950 {
+  background-image: var(--bb-primary-fill);
+}
+
+:where(button, a).bg-red-950 {
+  box-shadow: var(--bb-primary-glow);
+}
+
+/*
+  Page arrival. Each dashboard page settles into place: a short rise out of a
+  soft blur, children in sequence, the whole thing done inside half a second
+  so it reads as the page landing rather than as something to wait for.
+*/
+@keyframes bb-settle {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+[data-portal-content] > * {
+  animation: bb-settle 0.48s var(--ease-out-expo) both;
+}
+
+[data-portal-content] > :nth-child(2) {
+  animation-delay: 70ms;
+}
+
+[data-portal-content] > :nth-child(3) {
+  animation-delay: 140ms;
+}
+
+[data-portal-content] > :nth-child(n + 4) {
+  animation-delay: 200ms;
+}
+
+/* Press feedback: controls give under the finger, then spring back. */
+:where(button, [role="button"], a.inline-flex):not(:disabled):active {
+  transform: scale(0.97);
+}
+
+/*
+  Theme switch. The new theme spreads out from the toggle like ink
+  (ThemeToggle drives the circle's origin and size); the old one simply stays
+  underneath until it is covered, so nothing cross-fades to mud.
+*/
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-new(root) {
+  z-index: 2;
+}
+
+/*
+  Pointer glow. InteractionLayer tells the card under the mouse where the
+  pointer is (--mx/--my); a soft light in the card's own colour follows it.
+  Mouse only — touch has no hover — and it fades out when the pointer leaves.
+*/
+.bb-tile::after,
+.bb-spot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    260px circle at var(--mx, -999px) var(--my, -999px),
+    oklch(72% 0.16 var(--h, 14) / 0.16),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.35s var(--ease-out-expo);
+}
+
+.bb-tile:hover::after,
+.bb-spot:hover::after {
+  opacity: 1;
+}
+
+/* Linked tiles are controls: they press like one. */
+a.bb-tile:active {
+  transform: translateY(0) scale(0.985);
 }

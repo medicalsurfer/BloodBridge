@@ -7,6 +7,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { CountUp } from "./CountUp";
 
 /* ── Labels ─────────────────────────────────────────────────────────── */
 
@@ -31,6 +32,12 @@ export function RuledEyebrow({ children }: { children: ReactNode }) {
 
 /* ── Page header ────────────────────────────────────────────────────── */
 
+/*
+  The heading speaks for itself. The small ruled label that used to sit above
+  every title repeated what the top bar already says, and a kicker over every
+  heading is the most recognisable template habit there is. `eyebrow` is kept
+  as the header's accessible name so no caller has to change.
+*/
 export function PageHeader({
   eyebrow,
   title,
@@ -44,13 +51,12 @@ export function PageHeader({
 }) {
   return (
     <header
-      className="flex flex-col gap-5 border-b border-slate-200 pb-7 sm:flex-row sm:items-end sm:justify-between"
+      aria-label={eyebrow}
+      className="flex flex-col gap-5 pb-2 sm:flex-row sm:items-end sm:justify-between"
       style={{ animation: "var(--animate-rise)" }}
     >
       <div className="min-w-0">
-        <RuledEyebrow>{eyebrow}</RuledEyebrow>
-
-        <h1 className="mt-3 text-[34px] font-semibold leading-[1.1] tracking-[-0.022em] text-slate-950">
+        <h1 className="text-[40px] font-semibold leading-[1.05] tracking-[-0.028em] text-slate-950">
           {title}
         </h1>
 
@@ -113,7 +119,7 @@ export function Panel({
     <section
       id={id}
       // Scrolled-to panels would otherwise sit flush under the sticky top bar.
-      className={`scroll-mt-6 rounded-2xl border border-slate-200 bg-white ${padded ? "p-6" : ""} ${className}`}
+      className={`bb-spot relative scroll-mt-6 rounded-2xl border border-slate-200 bg-white shadow-[var(--bb-card-shadow)] ${padded ? "p-6" : ""} ${className}`}
     >
       {(label || action) && (
         <div className={`flex items-center justify-between gap-3 ${padded ? "" : "px-6 pt-6"}`}>
@@ -129,14 +135,10 @@ export function Panel({
 
 /* ── Stat grid ──────────────────────────────────────────────────────── */
 
-// Dividers come from a 1px grid gap over a slate background, so the row reads
-// as one instrument instead of four separate floating tiles.
+// Each figure gets its own tile and its own colour from the brand family
+// (see .bb-tiles in globals.css), so a row reads as distinct facts.
 export function StatGrid({ children }: { children: ReactNode }) {
-  return (
-    <div className="grid gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-200 sm:grid-cols-2 lg:grid-cols-4">
-      {children}
-    </div>
-  );
+  return <div className="bb-tiles grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">{children}</div>;
 }
 
 export function Stat({
@@ -144,45 +146,57 @@ export function Stat({
   value,
   foot,
   tone = "default",
+  href,
 }: {
   label: string;
   value: string;
   foot?: string;
   tone?: "default" | "good" | "warn" | "critical";
+  /** Makes the tile a link to the page where this figure is managed. */
+  href?: string;
 }) {
-  const toneClass =
-    tone === "good"
-      ? "text-emerald-700"
-      : tone === "warn"
-        ? "text-amber-700"
-        : tone === "critical"
-          ? "text-garnet"
-          : "text-slate-950";
-
-  // The tone rail restates state as position and colour, so a critical figure
-  // is legible in a glance down the row — not only by reading the number.
-  const railClass =
-    tone === "good"
-      ? "bg-emerald-500"
-      : tone === "warn"
-        ? "bg-ember"
-        : tone === "critical"
-          ? "bg-gradient-to-b from-crimson to-garnet"
-          : "bg-transparent";
-
-  return (
-    <div className="group relative bg-white px-5 py-5 transition-colors duration-300 hover:bg-slate-50">
-      <span aria-hidden className={`absolute inset-y-0 left-0 w-0.5 ${railClass}`} />
-
-      <Eyebrow>{label}</Eyebrow>
+  // A tone recolours the whole tile (see .bb-tile in globals.css), so state
+  // shows as colour, as a word in the value, and as the label's dot.
+  const body = (
+    <>
+      <p className="flex items-center gap-2 text-[12px] font-semibold text-slate-600">
+        <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: "var(--tile-dot)" }} />
+        {label}
+      </p>
 
       <p
-        className={`mt-3 text-[28px] font-semibold leading-none tracking-[-0.025em] tabular-nums ${toneClass}`}
+        className="mt-3.5 font-display text-[32px] font-semibold leading-none tracking-[-0.025em] tabular-nums"
+        style={{ color: "var(--tile-ink)" }}
       >
-        {value}
+        <CountUp value={value} />
       </p>
 
       {foot && <p className="mt-2.5 truncate text-xs text-slate-500">{foot}</p>}
+
+      {href && (
+        <span
+          aria-hidden
+          className="absolute right-4 top-4 flex h-7 w-7 -translate-x-1 items-center justify-center rounded-full opacity-0 transition duration-300 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100"
+          style={{ background: "color-mix(in oklch, var(--tile-dot) 16%, transparent)", color: "var(--tile-ink)" }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </span>
+      )}
+    </>
+  );
+
+  const className = "bb-tile group relative overflow-hidden rounded-2xl px-5 pb-5 pt-4";
+  const toneAttr = tone === "default" ? undefined : tone;
+
+  return href ? (
+    <Link href={href} className={`${className} block`} data-tone={toneAttr}>
+      {body}
+    </Link>
+  ) : (
+    <div className={className} data-tone={toneAttr}>
+      {body}
     </div>
   );
 }

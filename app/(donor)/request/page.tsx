@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   PageHeader,
@@ -173,8 +173,41 @@ export default function RequestsPage() {
                   description="When a health institute raises a request, it appears here so you can respond."
                 />
               </div>
+            ) : donorBloodGroup ? (
+              /*
+                The API already lists matching requests first; the two groups
+                make that order visible, so a donor sees at a glance which
+                requests are theirs to answer and where that list ends.
+              */
+              <>
+                <RequestGroup
+                  title="You can help with these"
+                  hint={`Compatible with your ${bloodGroupLabels[donorBloodGroup]} blood`}
+                  tone="match"
+                  requests={visibleRequests.filter((request) => request.canDonate)}
+                  emptyText="None of the open requests match your blood group right now."
+                  renderRow={renderRequest}
+                />
+                {!matchingOnly && (
+                  <RequestGroup
+                    title="Other open requests"
+                    hint="Your blood group isn't compatible, but others may be able to help"
+                    tone="other"
+                    requests={visibleRequests.filter((request) => !request.canDonate)}
+                    renderRow={renderRequest}
+                  />
+                )}
+              </>
             ) : (
-              visibleRequests.map((request) => (
+              visibleRequests.map(renderRequest)
+            )}
+          </div>
+        </Panel>
+    </div>
+  );
+
+  function renderRequest(request: BloodRequestItem) {
+    return (
                 <Row key={request.id}>
                   <div className="flex min-w-0 gap-4">
                     <div
@@ -218,10 +251,51 @@ export default function RequestsPage() {
                     Respond · Book donation
                   </Link>
                 </Row>
-              ))
-            )}
-          </div>
-        </Panel>
-    </div>
+    );
+  }
+}
+
+/** One labelled group of requests, with a count, inside the requests panel. */
+function RequestGroup({
+  title,
+  hint,
+  tone,
+  requests,
+  emptyText,
+  renderRow,
+}: {
+  title: string;
+  hint: string;
+  tone: "match" | "other";
+  requests: BloodRequestItem[];
+  emptyText?: string;
+  renderRow: (request: BloodRequestItem) => ReactNode;
+}) {
+  if (requests.length === 0 && !emptyText) return null;
+
+  return (
+    <section aria-label={title}>
+      <div
+        className={`flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-6 py-3 ${
+          tone === "match" ? "bg-emerald-50" : "bg-slate-50"
+        }`}
+      >
+        <h2 className="flex items-center gap-2 font-sans text-[13px] font-semibold text-slate-800">
+          <span
+            aria-hidden
+            className={`h-2 w-2 rounded-full ${tone === "match" ? "bg-emerald-600" : "bg-slate-400"}`}
+          />
+          {title}
+          <span className="font-normal text-slate-500">({requests.length})</span>
+        </h2>
+        <p className="text-xs text-slate-500">{hint}</p>
+      </div>
+
+      {requests.length === 0 ? (
+        <p className="px-6 py-5 text-sm text-slate-500">{emptyText}</p>
+      ) : (
+        requests.map(renderRow)
+      )}
+    </section>
   );
 }

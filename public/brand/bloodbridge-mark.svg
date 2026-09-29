@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300" role="img" aria-label="BloodBridge">
+  <defs>
+    <!-- Body: deep oxblood at the edges, crimson through the middle. -->
+    <linearGradient id="bb-body" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#1c0208"/>
+      <stop offset="0.3" stop-color="#560a1c"/>
+      <stop offset="0.58" stop-color="#9c1734"/>
+      <stop offset="0.82" stop-color="#5a0a1d"/>
+      <stop offset="1" stop-color="#23030b"/>
+    </linearGradient>
+    <!-- Light passing through the base of the drop. -->
+    <radialGradient id="bb-glow" cx="0.6" cy="0.92" r="0.5">
+      <stop offset="0" stop-color="#ff5a7e" stop-opacity="0.9"/>
+      <stop offset="0.5" stop-color="#d1284f" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#d1284f" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Glassy highlights. -->
+    <linearGradient id="bb-shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="0.4" stop-color="#fff" stop-opacity="0.8"/>
+      <stop offset="0.85" stop-color="#fff" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="bb-bead" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2a040d"/>
+      <stop offset="0.55" stop-color="#b21d3e"/>
+      <stop offset="1" stop-color="#3a0613"/>
+    </linearGradient>
+    <radialGradient id="bb-shadow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#7a1028" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#7a1028" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="bb-soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+    <clipPath id="bb-clip">
+      <path id="bb-drop-shape" d="M100 74 C101 150 162 168 162 230 A62 62 0 0 1 38 230 C38 168 99 150 100 74 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Soft shadow on the ground -->
+  <ellipse cx="106" cy="292" rx="64" ry="7" fill="url(#bb-shadow)"/>
+
+  <!-- Fine thread, widening as it meets the drop -->
+  <path d="M99.5 34 L100.5 34 L101.3 104 L98.7 104 Z" fill="#5e0b1f"/>
+
+  <!-- The bead at the tip, drawn to a point -->
+  <path d="M100 4 C102.5 16 107 22 107 29 A7 7 0 0 1 93 29 C93 22 97.5 16 100 4 Z" fill="url(#bb-bead)"/>
+  <path d="M96.8 23 C96 25.5 96 28 96.8 30.5" stroke="#fff" stroke-opacity="0.75" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+
+  <!-- The drop -->
+  <path d="M100 74 C101 150 162 168 162 230 A62 62 0 0 1 38 230 C38 168 99 150 100 74 Z" fill="url(#bb-body)"/>
+  <g clip-path="url(#bb-clip)">
+    <rect x="30" y="70" width="140" height="230" fill="url(#bb-glow)"/>
+    <!-- A soft, dark core gives the glass its depth -->
+    <ellipse cx="94" cy="190" rx="16" ry="60" fill="#1c0208" opacity="0.35" filter="url(#bb-soft)"/>
+  </g>
+
+  <!-- Reflections -->
+  <path d="M58 204 C48 222 48 250 62 270" stroke="url(#bb-shine)" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M94 128 C88 146 76 160 66 174" stroke="url(#bb-shine)" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.75"/>
+</svg>

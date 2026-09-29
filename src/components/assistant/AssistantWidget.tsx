@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import styles from "./AssistantWidget.module.css";
 
 /*
@@ -32,6 +32,7 @@ type ChatMessage = {
 };
 
 type AuthUser = {
+  id: string;
   firstName: string;
   role: string;
   bloodGroup: string | null;
@@ -93,6 +94,22 @@ const SUGGESTIONS_BY_ROLE: Record<string, string[]> = {
   ],
 };
 
+type ConversationSummary = {
+  id: string;
+  title: string;
+  updatedAt: string;
+  messageCount: number;
+};
+
+function formatWhen(iso: string) {
+  const date = new Date(iso);
+  const today = new Date();
+  const sameDay = date.toDateString() === today.toDateString();
+  return sameDay
+    ? date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+}
+
 /** Ids and timestamps for the optimistic pair, created outside render. */
 function newTurn(content: string): [ChatMessage, ChatMessage] {
   const stamp = Date.now();
@@ -113,11 +130,46 @@ export function AssistantWidget() {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  /** The open conversation; null until the first message of a new chat. */
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [view, setView] = useState<"chat" | "history">("chat");
+  const [conversations, setConversations] = useState<ConversationSummary[] | null>(null);
   const msgsRef = useRef<HTMLDivElement>(null);
   const draftRef = useRef<HTMLTextAreaElement>(null);
 
   const pathname = usePathname();
   const onPublicPage = PUBLIC_ROUTES.includes(pathname);
+
+  /*
+    Whose chat this is.
+
+    The widget lives in the root layout, so it is not remounted when someone
+    signs out and another person signs in: it kept the first person's
+    messages in memory and showed them to the second. Everything is wiped the
+    moment the app reaches a public page (sign-out lands on /login) and again
+    whenever the signed-in account changes. Both are done while rendering,
+    React's pattern for resetting state when an input changes.
+  */
+  const [wasOnPublicPage, setWasOnPublicPage] = useState(onPublicPage);
+  if (wasOnPublicPage !== onPublicPage) {
+    setWasOnPublicPage(onPublicPage);
+    if (onPublicPage) {
+      setUser(null);
+      setCheckedAuth(false);
+    }
+  }
+
+  const [chatOwner, setChatOwner] = useState<string | null>(null);
+  if ((user?.id ?? null) !== chatOwner) {
+    setChatOwner(user?.id ?? null);
+    setOpen(false);
+    setMessages([]);
+    setHistoryLoaded(false);
+    setConversationId(null);
+    setConversations(null);
+    setView("chat");
+    setDraft("");
+  }
 
   useEffect(() => {
     // Nothing to ask on a page the assistant will not appear on.
@@ -130,12 +182,16 @@ export function AssistantWidget() {
       .finally(() => setCheckedAuth(true));
   }, [onPublicPage]);
 
+  // First open: reopen the most recent conversation.
   useEffect(() => {
     if (!open || historyLoaded || !user) return;
 
     fetch("/api/ai-chat", { credentials: "include", cache: "no-store" })
       .then((response) => (response.ok ? response.json() : { messages: [] }))
-      .then((data) => setMessages(data.messages ?? []))
+      .then((data) => {
+        setMessages(data.messages ?? []);
+        setConversationId(data.conversation?.id ?? null);
+      })
       .catch(() => setMessages([]))
       .finally(() => setHistoryLoaded(true));
   }, [open, historyLoaded, user]);
@@ -187,7 +243,7 @@ export function AssistantWidget() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content }),
+        body: JSON.stringify({ message: content, conversationId }),
       });
 
       if (!response.ok || !response.body) {
@@ -195,6 +251,11 @@ export function AssistantWidget() {
         setReply(() => data?.error ?? "Something went wrong. Please try again.");
         return;
       }
+
+      // A new chat gets its id with the first reply.
+      const startedId = response.headers.get("X-Conversation-Id");
+      if (startedId) setConversationId(startedId);
+      setConversations(null);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -213,15 +274,54 @@ export function AssistantWidget() {
     }
   }
 
-  async function clearChat() {
-    if (sending || messages.length === 0) return;
-    if (!window.confirm("Clear this conversation? This can't be undone.")) return;
+  function newChat() {
+    if (sending) return;
+    setConversationId(null);
+    setMessages([]);
+    setHistoryLoaded(true);
+    setView("chat");
+    draftRef.current?.focus();
+  }
 
-    const response = await fetch("/api/ai-chat", { method: "DELETE", credentials: "include" }).catch(
+  async function showHistory() {
+    if (sending) return;
+    setView("history");
+    const response = await fetch("/api/ai-chat/conversations", { credentials: "include", cache: "no-store" }).catch(
       () => null,
     );
+    const data = response?.ok ? await response.json().catch(() => null) : null;
+    setConversations(data?.conversations ?? []);
+  }
 
-    if (response?.ok) setMessages([]);
+  async function openConversation(id: string) {
+    // Not via historyLoaded: clearing it would re-run the first-open load,
+    // which fetches the latest conversation and overwrites this one.
+    setView("chat");
+    setMessages([]);
+    const response = await fetch(`/api/ai-chat?conversationId=${encodeURIComponent(id)}`, {
+      credentials: "include",
+      cache: "no-store",
+    }).catch(() => null);
+    const data = response?.ok ? await response.json().catch(() => null) : null;
+    setMessages(data?.messages ?? []);
+    setConversationId(data?.conversation?.id ?? null);
+  }
+
+  async function deleteConversation(id: string) {
+    if (sending) return;
+    if (!window.confirm("Delete this conversation? This can't be undone.")) return;
+
+    const response = await fetch(`/api/ai-chat?conversationId=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      credentials: "include",
+    }).catch(() => null);
+    if (!response?.ok) return;
+
+    setConversations((current) => current?.filter((conversation) => conversation.id !== id) ?? null);
+    if (id === conversationId) {
+      setConversationId(null);
+      setMessages([]);
+    }
   }
 
   const suggestions = SUGGESTIONS_BY_ROLE[user.role] ?? [];
@@ -238,10 +338,9 @@ export function AssistantWidget() {
         aria-expanded={open}
         aria-label={open ? "Close BloodBridge Assistant" : "Open BloodBridge Assistant"}
       >
-        <svg className={styles.icChat} width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-          <path d="M4 5h16v11H8l-4 4V5Z" />
-          <path d="M9 10.5h6M9 13h3" />
-        </svg>
+        <span className={styles.icChat}>
+          <Mascot size={34} />
+        </span>
         <svg className={styles.icClose} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
           <path d="M6 6l12 12M18 6 6 18" />
         </svg>
@@ -256,26 +355,51 @@ export function AssistantWidget() {
       >
         <div className={styles.head}>
           <div className={styles.headIcon}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
-              <path d="M12 3.5c2.8 3.8 7 8.9 7 12.5a7 7 0 1 1-14 0c0-3.6 4.2-8.7 7-12.5Z" />
-            </svg>
+            <Mascot size={34} mood={sending ? "thinking" : "idle"} />
             <span className={styles.headStatus} aria-hidden />
           </div>
 
           <div className={styles.headText}>
             <div className={styles.headTitle}>BloodBridge Assistant</div>
-            <div className={styles.headSub}>Usually answers in a few seconds</div>
+            <div className={styles.headSub}>{sending ? "Thinking…" : "Online · here to help"}</div>
           </div>
 
           <div className={styles.headActions}>
-            {messages.length > 0 && (
+            <button
+              type="button"
+              className={`${styles.headBtn} ${view === "history" ? styles.headBtnActive : ""}`}
+              onClick={() => (view === "history" ? setView("chat") : showHistory())}
+              disabled={sending}
+              aria-label="Past conversations"
+              aria-pressed={view === "history"}
+              title="Past conversations"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4v4h4M12 8v4l3 2" />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              className={styles.headBtn}
+              onClick={newChat}
+              disabled={sending}
+              aria-label="New chat"
+              title="New chat"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+
+            {view === "chat" && conversationId && (
               <button
                 type="button"
                 className={styles.headBtn}
-                onClick={clearChat}
+                onClick={() => deleteConversation(conversationId)}
                 disabled={sending}
-                aria-label="Clear conversation"
-                title="Clear conversation"
+                aria-label="Delete this conversation"
+                title="Delete this conversation"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                   <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
@@ -312,6 +436,57 @@ export function AssistantWidget() {
 
         <div className={styles.body}>
           <div className={styles.main}>
+            {view === "history" && (
+              <div className={styles.history}>
+                <div className={styles.historyHead}>
+                  <span className={styles.infoLabel}>Past conversations</span>
+                  <button type="button" className={styles.historyNew} onClick={newChat}>
+                    + New chat
+                  </button>
+                </div>
+
+                {conversations === null ? (
+                  <div className={styles.typing} aria-label="Loading conversations">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                ) : conversations.length === 0 ? (
+                  <p className={styles.introBody}>No past conversations yet. Ask a question to start one.</p>
+                ) : (
+                  <ul className={styles.historyList}>
+                    {conversations.map((conversation) => (
+                      <li key={conversation.id} className={styles.historyItem}>
+                        <button
+                          type="button"
+                          className={`${styles.historyOpen} ${conversation.id === conversationId ? styles.historyCurrent : ""}`}
+                          onClick={() => openConversation(conversation.id)}
+                        >
+                          <span className={styles.historyTitle}>{conversation.title}</span>
+                          <span className={styles.historyMeta}>
+                            {formatWhen(conversation.updatedAt)} · {conversation.messageCount} message
+                            {conversation.messageCount === 1 ? "" : "s"}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.headBtn}
+                          onClick={() => deleteConversation(conversation.id)}
+                          aria-label={`Delete conversation: ${conversation.title}`}
+                          title="Delete"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                            <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                          </svg>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {view === "chat" && (
             <div className={styles.msgs} ref={msgsRef}>
               {!historyLoaded ? (
                 <div className={styles.typing} aria-label="Loading">
@@ -321,9 +496,12 @@ export function AssistantWidget() {
                 </div>
               ) : messages.length === 0 ? (
                 <div className={styles.intro}>
-                  <p className={styles.introTitle}>Hello {user.firstName}</p>
+                  <span className={styles.introMascot}>
+                    <Mascot size={76} mood="happy" />
+                  </span>
+                  <p className={styles.introTitle}>Hi {user.firstName}!</p>
                   <p className={styles.introBody}>
-                    Ask about eligibility, appointments, donation centres or rewards. General guidance
+                    Ask me about eligibility, appointments, donation centres or rewards. General guidance
                     only — your health institute answers medical questions.
                   </p>
                 </div>
@@ -346,7 +524,7 @@ export function AssistantWidget() {
                   return (
                     <div key={message.id} className={styles.botRow}>
                       <span className={styles.botAvatar} aria-hidden>
-                        <AssistantMark />
+                        <Mascot size={30} mood={streaming ? "thinking" : "happy"} />
                       </span>
 
                       <div className={`${styles.msg} ${styles.msgBot} ${styles.botBody}`}>
@@ -362,10 +540,10 @@ export function AssistantWidget() {
                 /* Waiting sits where the reply will appear, behind the same avatar. */
                 <div className={styles.botRow}>
                   <span className={styles.botAvatar} aria-hidden>
-                    <AssistantMark />
+                    <Mascot size={30} mood="thinking" />
                   </span>
 
-                  <div className={styles.typing} aria-label="The assistant is typing">
+                  <div className={`${styles.typing} ${styles.typingBubble}`} aria-label="The assistant is typing">
                     <span />
                     <span />
                     <span />
@@ -373,8 +551,9 @@ export function AssistantWidget() {
                 </div>
               )}
             </div>
+            )}
 
-            {showSuggestions && (
+            {view === "chat" && showSuggestions && (
               <div className={styles.suggested}>
                 {suggestions.map((suggestion) => (
                   <button
@@ -390,6 +569,7 @@ export function AssistantWidget() {
               </div>
             )}
 
+            {view === "chat" && (
             <div className={styles.inputRow}>
               <label htmlFor="assistant-draft" className="sr-only">
                 Ask the assistant
@@ -424,6 +604,7 @@ export function AssistantWidget() {
                 </svg>
               </button>
             </div>
+            )}
 
             <p className={styles.disclaimer}>Not medical advice.</p>
           </div>
@@ -541,11 +722,59 @@ export function AssistantWidget() {
 // "(/profile)" into links so the assistant can point people to pages.
 const REPLY_TOKEN = /(\*\*[^*]+\*\*|(?<![\w/])\/[a-z][a-z0-9-]*(?:\/[a-z0-9-]+)*)/g;
 
-/** The drop that marks an assistant turn, small enough for a 27px avatar. */
-function AssistantMark() {
+/*
+  The assistant's face: a blood drop with eyes and a smile. It blinks on its
+  own every few seconds, bobs while it is thinking, and grins when it has
+  just answered — so the panel feels like someone is there. Drawn in SVG from
+  the brand colours; the eyes and mouth are white so it reads on the garnet.
+*/
+type Mood = "idle" | "thinking" | "happy";
+
+function Mascot({ size = 28, mood = "idle" }: { size?: number; mood?: Mood }) {
+  const gradientId = `bbMascot${useId().replace(/:/g, "")}`;
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M12 2.5c3.6 4.2 6.5 7.7 6.5 11.1A6.5 6.5 0 0 1 12 20a6.5 6.5 0 0 1-6.5-6.4c0-3.4 2.9-6.9 6.5-11.1Z" />
+    <svg
+      className={`${styles.mascot} ${mood === "thinking" ? styles.mascotThinking : ""}`}
+      width={size}
+      height={size}
+      viewBox="0 0 48 48"
+      aria-hidden
+    >
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="oklch(66% 0.2 18)" />
+          <stop offset="0.55" stopColor="oklch(50% 0.19 15)" />
+          <stop offset="1" stopColor="oklch(34% 0.14 5)" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M24 3c7 8.4 14.5 16.2 14.5 24.8A14.5 14.5 0 0 1 9.5 27.8C9.5 19.2 17 11.4 24 3Z"
+        fill={`url(#${gradientId})`}
+      />
+      {/* Shine */}
+      <path d="M15 24c-.9 2.6-.7 5.4.6 7.6" stroke="#fff" strokeOpacity="0.55" strokeWidth="2" fill="none" strokeLinecap="round" />
+      {/* Eyes */}
+      <g className={styles.mascotEyes}>
+        <ellipse cx="19.5" cy="27" rx="2.1" ry="2.7" fill="#fff" />
+        <ellipse cx="28.5" cy="27" rx="2.1" ry="2.7" fill="#fff" />
+        <circle cx="20" cy="27.6" r="1.05" fill="oklch(22% 0.06 12)" />
+        <circle cx="29" cy="27.6" r="1.05" fill="oklch(22% 0.06 12)" />
+      </g>
+      {/* Mouth */}
+      {mood === "thinking" ? (
+        <circle cx="24" cy="34.2" r="1.5" fill="#fff" />
+      ) : (
+        <path
+          d={mood === "happy" ? "M19.5 32.6c2.6 3.4 6.4 3.4 9 0" : "M20.5 33.2c2 2 5 2 7 0"}
+          stroke="#fff"
+          strokeWidth="1.8"
+          fill="none"
+          strokeLinecap="round"
+        />
+      )}
+      {/* Cheeks */}
+      <circle cx="15.5" cy="31.5" r="1.9" fill="oklch(78% 0.13 20)" opacity="0.55" />
+      <circle cx="32.5" cy="31.5" r="1.9" fill="oklch(78% 0.13 20)" opacity="0.55" />
     </svg>
   );
 }

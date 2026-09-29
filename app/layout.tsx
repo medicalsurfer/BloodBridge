@@ -4,6 +4,7 @@ import Script from "next/script";
 import { Fraunces, JetBrains_Mono, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 import { AssistantWidget } from "@/src/components/assistant/AssistantWidget";
+import { InteractionLayer } from "@/src/components/ui/InteractionLayer";
 
 // Three roles, three faces: a characterful serif for display, a clean humanist
 // sans for everything operational, and a mono for identifiers and figures.
@@ -40,19 +41,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const theme = chosenTheme === "dark" || chosenTheme === "light" ? chosenTheme : undefined;
 
   /*
-    The assistant is for signed-in people, so it is not rendered at all when
-    there is no session cookie. It used to mount everywhere and ask
-    /api/auth/me who the visitor was — which on the landing, login, register,
-    privacy and terms pages is a request that can only come back 401, and the
-    browser logs every one of those in the console.
-
-    The cookie is only checked for existence here, not verified: an expired one
-    still mounts the widget, which then hides itself after its own check. That
-    keeps this free — no token verification and no database read on a page
-    nobody has signed in to.
+    The assistant is mounted on every page and decides for itself whether to
+    show: it asks nothing on public pages (landing, login, register, privacy,
+    terms), so those make no /api/auth/me request that could only come back
+    401. It is not gated on the session cookie here, because this layout is
+    not re-rendered when someone signs in and the app moves to their dashboard
+    without a full reload — a gate here left the assistant missing until the
+    page was refreshed.
   */
-  const hasSession = cookieStore.has("bloodbridge_session");
-
   return (
     <html
       lang="en"
@@ -73,7 +69,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </Script>
 
         {children}
-        {hasSession && <AssistantWidget />}
+        <AssistantWidget />
+        <InteractionLayer />
       </body>
     </html>
   );

@@ -169,10 +169,11 @@ function StatRow({ user }: { user: User }) {
 
   return (
     <div className="mt-7"><StatGrid>
-      <Stat label="Blood group" value={user.bloodGroup ?? "Not set"} foot="On your donor profile" />
+      <Stat label="Blood group" value={user.bloodGroup ?? "Not set"} foot="On your donor profile" href="/profile" />
 
       <Stat
         label="Eligibility"
+        href="/eligibility"
         value={user.eligibilityStatus ? "Eligible" : "Not yet"}
         foot={user.nextEligibleDate ?? "Complete the check"}
         tone={user.eligibilityStatus ? "good" : "default"}
@@ -180,12 +181,14 @@ function StatRow({ user }: { user: User }) {
 
       <Stat
         label="Donations"
+        href="/donations"
         value={String(user.donations ?? 0)}
         foot={`${user.livesImpacted ?? 0} lives supported`}
       />
 
       <Stat
         label="Next appointment"
+        href="/appointments"
         value={
           appointment
             ? new Date(appointment.appointmentDate).toLocaleDateString("en-GB", {

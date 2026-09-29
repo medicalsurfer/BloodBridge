@@ -51,8 +51,9 @@ export type DonorFacts = {
   latestCheck: { status: string; date: Date; daysRemaining: number; reasons: string[] } | null;
   markedEligible: boolean;
   nextAppointment: { date: Date; time: string; centre: string; city: string } | null;
-  centres: { name: string; city: string; openGroups: BloodGroupValue[] }[];
 };
+
+export type CentreFact = { name: string; city: string; openGroups: BloodGroupValue[] };
 
 export type StaffFacts = {
   totalDonors: number;
@@ -77,6 +78,8 @@ export type StaffFacts = {
 export type AssistantFacts = {
   role: string;
   today: Date;
+  /** Every active centre, for every role: staff ask where to send people too. */
+  centres: CentreFact[];
   donor?: DonorFacts;
   staff?: StaffFacts;
 };
@@ -233,7 +236,7 @@ function compatibilityAnswer(message: string, own: BloodGroupValue | null): Syst
   };
 }
 
-function donorAnswer(message: string, facts: DonorFacts, today: Date): SystemAnswer | null {
+function donorAnswer(message: string, facts: DonorFacts, today: Date, centres: CentreFact[]): SystemAnswer | null {
   const text = message.toLowerCase();
 
   const compatibility = compatibilityAnswer(message, facts.bloodGroup);
@@ -293,40 +296,9 @@ function donorAnswer(message: string, facts: DonorFacts, today: Date): SystemAns
         };
   }
 
-  /*
-    Donation centres. Listing them is the system's job outright (final): asked
-    for "the available donation centers", the model pasted its own notes into
-    the chat — "AD LUCEM, Obobogo: none", "(this donor's blood is compatible)".
-    A list is exactly what the system writes better.
-  */
+  // Where is my blood needed?
   const aboutCentres = /\b(centres?|centers?|hospitals?|clinics?|institutes?|blood banks?)\b/.test(text);
   const aboutNeed = /\bneed\w*\b|\bhelp\b|\bshort\w*\b|\brequests?\b/.test(text);
-
-  if (
-    (aboutCentres && /\b(what|which|where|list|available|all|near\w*|show|are there|any)\b/.test(text) && !aboutNeed) ||
-    /\bwhere (can|do|should) i (donate|give)\b/.test(text)
-  ) {
-    if (!facts.centres.length) {
-      return { intent: "centre-list", text: "There are **no active donation centres** right now.", anchors: [], final: true };
-    }
-
-    const own = facts.bloodGroup;
-    const needing = own ? facts.centres.filter((centre) => centre.openGroups.some((group) => canDonateTo(own, group))) : [];
-
-    return {
-      intent: "centre-list",
-      text:
-        `There ${facts.centres.length === 1 ? "is" : "are"} **${plural(facts.centres.length, "active donation centre")}**:\n` +
-        facts.centres
-          .map((centre) => `- **${centre.name}**, ${centre.city}${own && needing.includes(centre) ? ` — needs blood your ${label(own)} can give` : ""}`)
-          .join("\n") +
-        "\n\nBook a visit at any of them from **Book a donation**.",
-      anchors: [],
-      final: true,
-    };
-  }
-
-  // Where is my blood needed?
   if (
     (aboutCentres && aboutNeed) ||
     /\b(where|which)\b.*\b(needed|need)\b/.test(text) ||
@@ -341,7 +313,7 @@ function donorAnswer(message: string, facts: DonorFacts, today: Date): SystemAns
     }
 
     const own = facts.bloodGroup;
-    const needing = facts.centres.filter((centre) => centre.openGroups.some((group) => canDonateTo(own, group)));
+    const needing = centres.filter((centre) => centre.openGroups.some((group) => canDonateTo(own, group)));
 
     return needing.length
       ? {
@@ -587,14 +559,109 @@ export function isOffTopic(message: string): boolean {
  * to the model rather than answered wrongly.
  */
 export function systemAnswer(message: string, facts: AssistantFacts): SystemAnswer | null {
-  if (isOffTopic(message)) return { intent: "off-topic", text: OFF_TOPIC_REPLY, anchors: [], final: true };
-
   const health = healthAnswer(message);
   if (health) return health;
 
-  if (facts.donor) return donorAnswer(message, facts.donor, facts.today);
+  // Before the topic check: "where is Yaounde" names a city with centres in it.
+  const city = cityAnswer(message, facts);
+  if (city) return city;
+
+  if (isOffTopic(message)) return { intent: "off-topic", text: OFF_TOPIC_REPLY, anchors: [], final: true };
+
+  const centres = centreAnswer(message, facts);
+  if (centres) return centres;
+
+  if (facts.donor) return donorAnswer(message, facts.donor, facts.today, facts.centres);
   if (facts.staff) return staffAnswer(message, facts.staff);
   return null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Centres — for every role                                             */
+/* ------------------------------------------------------------------ */
+
+/*
+  Listing centres is the system's job outright (final). Asked for "the
+  available donation centers", the model pasted its notes into the chat; and
+  a medical staff account, which was never given the list, answered "I can't
+  provide specific information about donation centers".
+*/
+const accentless = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+function centreLines(centres: CentreFact[], own: BloodGroupValue | null) {
+  return centres
+    .map((centre) => {
+      const helps = own && centre.openGroups.some((group) => canDonateTo(own, group));
+      return `- **${centre.name}**, ${centre.city}${helps ? ` — needs blood your ${label(own!)} can give` : ""}`;
+    })
+    .join("\n");
+}
+
+function nextStep(facts: AssistantFacts) {
+  return facts.donor
+    ? "Book a visit at any of them from **Book a donation**."
+    : "Donors book their visits from their own account.";
+}
+
+function centreAnswer(message: string, facts: AssistantFacts): SystemAnswer | null {
+  const text = message.toLowerCase();
+  const own = facts.donor?.bloodGroup ?? null;
+  const aboutCentres = /\b(centres?|centers?|hospitals?|clinics?|institutes?|blood banks?|laborator\w*|labs?)\b/.test(text);
+  const aboutNeed = /\bneed\w*\b|\bshort\w*\b|\brequests?\b/.test(text);
+
+  // "In which hospital can I analyse my blood?" / "How can I know my blood type?"
+  const aboutTesting =
+    /\b(analy[sz]\w*|test\w*|screen\w*|check\w*|know|find out|determine|discover)\b/.test(text) &&
+    /\bblood\b|\bblood (type|group)\b|\bgroupe sanguin\b/.test(text) &&
+    !/\beligib\w*\b/.test(text);
+
+  if (aboutTesting && (aboutCentres || /\b(where|which|how)\b/.test(text))) {
+    const list = facts.centres.length
+      ? `The health institutes on BloodBridge are:\n${centreLines(facts.centres, null)}`
+      : "There are no active health institutes on BloodBridge right now.";
+    return {
+      intent: "blood-test",
+      text: `Your blood group is determined by a simple laboratory test at a health institute, and it is confirmed every time you donate. ${list}\n\nOnce you know it, add it to ${facts.donor ? "**My profile**" : "the donor's profile"} so BloodBridge can match it to requests.`,
+      anchors: [],
+      final: true,
+    };
+  }
+
+  if (
+    (aboutCentres && /\b(what|which|where|list|available|all|near\w*|show|are there|any)\b/.test(text) && !aboutNeed) ||
+    /\bwhere (can|do|should) i (donate|give)\b/.test(text)
+  ) {
+    if (!facts.centres.length) {
+      return { intent: "centre-list", text: "There are **no active donation centres** right now.", anchors: [], final: true };
+    }
+    return {
+      intent: "centre-list",
+      text:
+        `There ${facts.centres.length === 1 ? "is" : "are"} **${plural(facts.centres.length, "active donation centre")}** on BloodBridge:\n` +
+        centreLines(facts.centres, own) +
+        `\n\n${nextStep(facts)}`,
+      anchors: [],
+      final: true,
+    };
+  }
+
+  return null;
+}
+
+/** "Where is Yaounde?" — the centres in a city BloodBridge covers. */
+function cityAnswer(message: string, facts: AssistantFacts): SystemAnswer | null {
+  const text = accentless(message);
+  const cities = [...new Set(facts.centres.map((centre) => centre.city))];
+  const city = cities.find((name) => new RegExp(`\\b${accentless(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(text));
+  if (!city) return null;
+
+  const here = facts.centres.filter((centre) => centre.city === city);
+  return {
+    intent: "city",
+    text: `BloodBridge has **${plural(here.length, "active donation centre")}** in ${city}:\n${centreLines(here, facts.donor?.bloodGroup ?? null)}\n\n${nextStep(facts)}`,
+    anchors: [],
+    final: true,
+  };
 }
 
 const normalise = (value: string) =>

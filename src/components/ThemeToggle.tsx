@@ -90,6 +90,43 @@ export function useIsDark() {
   return useSyncExternalStore(subscribe, isDarkNow, () => false);
 }
 
+/*
+  The switch itself is the one authored moment in the theme: the new theme
+  spreads out from the button like ink until it covers the page. It uses the
+  View Transitions API — the browser snapshots the page, the theme changes
+  underneath, and the new snapshot is revealed through a growing circle.
+
+  Browsers without the API, and anyone who asks for reduced motion, get an
+  instant switch instead, which is the same result with no movement.
+*/
+function switchThemeFrom(button: HTMLElement, next: Theme) {
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (!document.startViewTransition || reduceMotion) {
+    setTheme(next);
+    return;
+  }
+
+  const box = button.getBoundingClientRect();
+  const x = box.left + box.width / 2;
+  const y = box.top + box.height / 2;
+  // Far enough to reach the corner of the viewport furthest from the button.
+  const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+
+  const transition = document.startViewTransition(() => setTheme(next));
+
+  transition.ready
+    .then(() => {
+      document.documentElement.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+        { duration: 620, easing: "cubic-bezier(0.16, 1, 0.3, 1)", pseudoElement: "::view-transition-new(root)" },
+      );
+    })
+    .catch(() => {
+      // A skipped transition still applied the theme; there is nothing to animate.
+    });
+}
+
 export function ThemeToggle({ className = "" }: { className?: string }) {
   const isDark = useIsDark();
   const label = isDark ? "Switch to light mode" : "Switch to dark mode";
@@ -97,7 +134,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   return (
     <button
       type="button"
-      onClick={() => setTheme(isDark ? "light" : "dark")}
+      onClick={(event) => switchThemeFrom(event.currentTarget, isDark ? "light" : "dark")}
       title={label}
       aria-label={label}
       aria-pressed={isDark}

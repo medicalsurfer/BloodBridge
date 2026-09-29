@@ -15,10 +15,16 @@ import {
 
 const today = new Date(2026, 8, 28);
 
+const centres: AssistantFacts["centres"] = [
+  { name: "Central Hospital", city: "Yaoundé", openGroups: ["A_POSITIVE"] },
+  { name: "Laquintinie", city: "Douala", openGroups: ["AB_NEGATIVE"] },
+];
+
 function donor(overrides: Partial<DonorFacts> = {}): AssistantFacts {
   return {
     role: "DONOR",
     today,
+    centres,
     donor: {
       bloodGroup: "O_POSITIVE",
       missingFields: [],
@@ -30,10 +36,6 @@ function donor(overrides: Partial<DonorFacts> = {}): AssistantFacts {
       latestCheck: null,
       markedEligible: true,
       nextAppointment: null,
-      centres: [
-        { name: "Central Hospital", city: "Yaoundé", openGroups: ["A_POSITIVE"] },
-        { name: "Laquintinie", city: "Douala", openGroups: ["AB_NEGATIVE"] },
-      ],
       ...overrides,
     },
   };
@@ -43,6 +45,7 @@ function staff(overrides: Partial<StaffFacts> = {}): AssistantFacts {
   return {
     role: "LAB_TECHNICIAN",
     today,
+    centres,
     staff: {
       totalDonors: 11,
       markedEligible: 7,
@@ -217,6 +220,40 @@ describe("systemAnswer: topic", () => {
     for (const question of ["What should I focus on today?", "What is most needed?", "How do I record a donation?"]) {
       expect(systemAnswer(question, staff())?.intent).not.toBe("off-topic");
     }
+  });
+});
+
+describe("systemAnswer: centres for every role", () => {
+  // A medical staff account once answered "I can't provide specific
+  // information about donation centers": it had never been given the list.
+  it("lists the platform's centres for staff, without donor booking steps", () => {
+    const answer = systemAnswer("which donation centers are available in the platform", staff());
+    expect(answer?.intent).toBe("centre-list");
+    expect(answer?.text).toContain("**Central Hospital**, Yaoundé");
+    expect(answer?.text).not.toContain("Book a donation");
+  });
+
+  it("answers where to get blood analysed with the centres", () => {
+    for (const question of ["in whic hospital can i analyse my blood", "How can i know my blood type"]) {
+      const answer = systemAnswer(question, staff());
+      expect(answer?.intent).toBe("blood-test");
+      expect(answer?.text).toContain("Laquintinie");
+    }
+  });
+
+  it("treats a city with centres as on topic, accents or not", () => {
+    const answer = systemAnswer("where is yaounde", staff());
+    expect(answer?.intent).toBe("city");
+    expect(answer?.text).toContain("Central Hospital");
+    expect(answer?.text).not.toContain("Laquintinie");
+  });
+
+  it("still applies the health rules first", () => {
+    expect(systemAnswer("I have a cold, can I donate in Yaounde?", donor())?.intent).toBe("health-illness");
+  });
+
+  it("still turns away cities with no centres and other off-topic questions", () => {
+    expect(systemAnswer("where is Paris", staff())?.intent).toBe("off-topic");
   });
 });
 

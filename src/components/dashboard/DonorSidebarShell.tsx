@@ -261,7 +261,9 @@ export function DonorSidebarShell({
           </div>
         </div>
 
-        <div className={styles.content}>{children}</div>
+        <div className={styles.content} data-portal-content>
+          {children}
+        </div>
       </div>
     </div>
   );

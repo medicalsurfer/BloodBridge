@@ -354,12 +354,29 @@ export async function buildUserContext(userId: string): Promise<UserContext> {
 
   const today = new Date();
 
-  if (!user) return { text: "No account details are available.", facts: { role: "UNKNOWN", today } };
+  if (!user) return { text: "No account details are available.", facts: { role: "UNKNOWN", today, centres: [] } };
 
   const lines = [
     `Today is ${formatDate(today)}.`,
     `Signed-in user: ${user.firstName} ${user.lastName} (role: ${user.role}).`,
   ];
+
+  // Every role is asked where the centres are, so every role is told.
+  const centres = await prisma.healthInstitute.findMany({
+    where: ACTIVE_INSTITUTE,
+    orderBy: { name: "asc" },
+    take: 15,
+    select: {
+      name: true,
+      city: true,
+      bloodRequests: { where: { status: "OPEN" }, select: { bloodGroup: true, urgency: true } },
+    },
+  });
+  const centreFacts = centres.map((centre) => ({
+    name: centre.name,
+    city: centre.city,
+    openGroups: centre.bloodRequests.map((request) => request.bloodGroup),
+  }));
 
   if (user.role !== "DONOR") {
     if (user.healthInstitute) {
@@ -367,15 +384,21 @@ export async function buildUserContext(userId: string): Promise<UserContext> {
     }
 
     const staff = await staffFigures(user.role, user.healthInstituteId);
-    lines.push(...staff.lines, ...pageLines(user.role));
+    lines.push(...staff.lines);
+    lines.push(
+      centres.length
+        ? `Active donation centres on BloodBridge: ${centres.map((centre) => `${centre.name} in ${centre.city}`).join("; ")}.`
+        : "There are no active donation centres right now.",
+    );
+    lines.push(...pageLines(user.role));
 
-    return { text: lines.join("\n"), facts: { role: user.role, today, staff: staff.facts } };
+    return { text: lines.join("\n"), facts: { role: user.role, today, centres: centreFacts, staff: staff.facts } };
   }
 
   const profile = user.donorProfile;
   const bloodGroup = profile?.bloodGroup ?? null;
 
-  const [donationCount, nextAppointment, latestAssessment, centres] = await Promise.all([
+  const [donationCount, nextAppointment, latestAssessment] = await Promise.all([
     prisma.donation.count({ where: { donorId: userId } }),
     prisma.appointment.findFirst({
       where: { donorId: userId, status: { in: ["SCHEDULED", "CONFIRMED"] }, appointmentDate: { gte: new Date() } },
@@ -385,16 +408,6 @@ export async function buildUserContext(userId: string): Promise<UserContext> {
     prisma.eligibilityAssessment.findFirst({
       where: { donorId: userId },
       orderBy: { createdAt: "desc" },
-    }),
-    prisma.healthInstitute.findMany({
-      where: ACTIVE_INSTITUTE,
-      orderBy: { name: "asc" },
-      take: 15,
-      select: {
-        name: true,
-        city: true,
-        bloodRequests: { where: { status: "OPEN" }, select: { bloodGroup: true, urgency: true } },
-      },
     }),
   ]);
 
@@ -473,6 +486,7 @@ export async function buildUserContext(userId: string): Promise<UserContext> {
   const facts: AssistantFacts = {
     role: user.role,
     today,
+    centres: centreFacts,
     donor: {
       bloodGroup,
       missingFields: missing.filter((field): field is string => typeof field === "string"),
@@ -498,11 +512,6 @@ export async function buildUserContext(userId: string): Promise<UserContext> {
             city: nextAppointment.healthInstitute.city,
           }
         : null,
-      centres: centres.map((centre) => ({
-        name: centre.name,
-        city: centre.city,
-        openGroups: centre.bloodRequests.map((request) => request.bloodGroup),
-      })),
     },
   };
 

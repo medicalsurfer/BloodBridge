@@ -2,6 +2,8 @@
   display: flex;
   height: 100vh;
   background: var(--bb-bg);
+  /* The dark theme's ember-and-plum atmosphere; none in the light theme. */
+  background-image: var(--bb-glow);
   color: var(--bb-text);
   font-family: var(--font-source-sans-3), ui-sans-serif, system-ui, sans-serif;
 }
@@ -146,6 +148,51 @@
   background: linear-gradient(135deg, var(--color-crimson), var(--color-garnet-deep));
   color: var(--bb-on-accent);
   box-shadow: 0 4px 12px -4px oklch(27.1% 0.105 12.094 / 0.45);
+  /* Arrival: the new page's item lights up, then settles to its resting glow. */
+  animation: navLightUp 0.45s var(--ease-out-expo, ease-out) both;
+}
+
+/* Only a starting frame: it settles into whatever glow the theme defines. */
+@keyframes navLightUp {
+  from {
+    filter: brightness(1.35) saturate(1.2);
+    box-shadow: 0 0 0 0 oklch(58% 0.21 16 / 0.55);
+  }
+}
+
+/* The sidebar is a shade lifted from the page in the dark theme; give it the
+   same garnet warmth along its edge instead of a flat grey rule. */
+:global([data-theme="dark"]) .sidebar {
+  border-right-color: oklch(34% 0.06 14);
+  background-image: linear-gradient(180deg, oklch(24% 0.06 14 / 0.55), transparent 38%);
+}
+
+:global([data-theme="dark"]) .navItemActive {
+  background: linear-gradient(135deg, oklch(52% 0.19 17), oklch(34% 0.13 355));
+  box-shadow: 0 8px 20px -10px oklch(58% 0.21 16 / 0.8);
+}
+
+:global([data-theme="dark"]) .brandMark {
+  background: linear-gradient(135deg, oklch(56% 0.2 18), oklch(32% 0.13 355));
+  box-shadow: 0 6px 18px -8px oklch(58% 0.21 16 / 0.8);
+}
+
+/* The same, for visitors who chose nothing and whose system asks for dark. */
+@media (prefers-color-scheme: dark) {
+  :global(:root:not([data-theme="light"])) .sidebar {
+    border-right-color: oklch(34% 0.06 14);
+    background-image: linear-gradient(180deg, oklch(24% 0.06 14 / 0.55), transparent 38%);
+  }
+
+  :global(:root:not([data-theme="light"])) .navItemActive {
+    background: linear-gradient(135deg, oklch(52% 0.19 17), oklch(34% 0.13 355));
+    box-shadow: 0 8px 20px -10px oklch(58% 0.21 16 / 0.8);
+  }
+
+  :global(:root:not([data-theme="light"])) .brandMark {
+    background: linear-gradient(135deg, oklch(56% 0.2 18), oklch(32% 0.13 355));
+    box-shadow: 0 6px 18px -8px oklch(58% 0.21 16 / 0.8);
+  }
 }
 .navItemActive svg {
   opacity: 1;
@@ -318,4 +365,13 @@
   flex: 1;
   overflow-y: auto;
   padding: 26px 28px 40px 28px;
+}
+
+/* Menu items lean toward the pointer: the icon slides a touch on hover. */
+.navItem svg {
+  transition: transform 0.25s var(--ease-out-expo, ease-out), opacity 0.2s ease;
+}
+.navItem:hover svg {
+  transform: translateX(2px);
+  opacity: 1;
 }
